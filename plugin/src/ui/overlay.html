@@ -1,0 +1,30 @@
+<!-- This is for an overlay(element injection) that wrapped by external system, so HTML and body tags doesn't exist -->
+<div class="rg-bg-gray-200 rg-overflow-auto rg-flex rg-flex-col rg-flex-gap-2 rg-p-6 rg-min-w-[100vw] rg-min-h-[100vh] xl:rg-rounded-lg xl:rg-min-w-[80vw] xl:rg-min-h-[80vh] xl:rg-outline-2 xl:rg-outline-blue-500">
+    <div style="display: none">
+<!--        구성 요소 -->
+        <div id="rg-history" class="rg-flex rg-flex-col">
+            <div class="rg-flex rg-flex-row">
+                <span id="rg-history-message">메시지</span>
+                <span id="rg-history-commit-id" class="rg-ml-2">커밋 아이디</span>
+            </div>
+
+            <span id="rg-history-date">날자</span>
+        </div>
+    </div>
+    <div class="rg-flex rg-flex-row rg-justify-between">
+        <span>Risu Git</span>
+        <button id="rg-close-button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-x-icon lucide-circle-x"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+        </button>
+    </div>
+    <div class="rg-flex rg-flex-row rg-gap-2">
+        <button id="rg-commit-button" class="rg-bg-green-500 hover:rg-bg-green-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded">
+            저장
+        </button>
+        <button id="rg-push-button" class="rg-bg-blue-500 hover:rg-bg-blue-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded">
+            푸시
+        </button>
+    </div>
+    <span id="rg-last-commit-date">마지막 커밋 날자: 받아오는중</span>
+    <div id="rg-history-container" class="rg-flex rg-flex-col rg-gap-2"></div>
+</div>

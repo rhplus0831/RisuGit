@@ -1,7 +1,9 @@
-import {Overlay} from "../ui/overlay";
+import {BaseOverlay} from "../ui/baseOverlay";
 import overlayTemplate from '../ui/overlay.html';
 // @ts-ignore
 import tailwindStyles from '../../dist/main.css';
+// @ts-ignore
+import diffStyles from '../../node_modules/jsondiffpatch/lib/formatters/styles/html.css';
 
 // 주입된 스타일이 중복되지 않도록 한 번만 실행
 (function () {
@@ -12,6 +14,14 @@ import tailwindStyles from '../../dist/main.css';
         document.head.appendChild(style);
     }
     style.innerHTML = tailwindStyles;
+
+    let diffStyle: HTMLStyleElement | null = document.getElementById('risu-git-diff-styles') as HTMLStyleElement;
+    if(!diffStyle) {
+        diffStyle = document.createElement('style');
+        diffStyle.id = 'risu-git-diff-styles';
+        document.head.appendChild(diffStyle);
+    }
+    diffStyle.innerHTML = diffStyles;
 })();
 
 function makeMutationObserver(callback: () => void, targetNode: HTMLElement | undefined = undefined, config: MutationObserverInit | undefined = undefined) {
@@ -32,7 +42,7 @@ function makeMutationObserver(callback: () => void, targetNode: HTMLElement | un
 }
 
 let injectedButton: HTMLButtonElement | null = null;
-const overlay = new Overlay();
+const overlay = new BaseOverlay();
 
 async function getToolbar() {
     if (injectedButton) {
@@ -69,7 +79,7 @@ async function getToolbar() {
         }
     }
     button.onclick = () => {
-        overlay.show(overlayTemplate);
+        overlay.show(overlayTemplate, 'overlay');
     }
 }
 

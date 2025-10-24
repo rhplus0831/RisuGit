@@ -9,30 +9,52 @@ declare const process: {
     }
 };
 
+// @ts-ignore
+function getMyArgument(name: string) {
+    // @ts-ignore
+    return globalThis.__pluginApis__.getArg(`RisuGit::${name}`)
+}
+
 export function getGitURL() {
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_URL;
     }
-    return getArg("risu_git_url");
+    return getMyArgument("git_url");
 }
 
 export function getGitId() {
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_ID;
     }
-    return getArg("risu_git_id");
+    return getMyArgument("git_id");
 }
 
 export function getGitPassword() {
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_PASSWORD;
     }
-    return getArg("risu_git_password");
+    return getMyArgument("git_password");
 }
 
 export function getGitProxy() {
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_PROXY;
     }
-    return getArg("risu_git_proxy");
+    return getMyArgument("git_proxy");
+}
+
+export function getBranch() {
+    let branch = getMyArgument("git_branch");
+    if(!branch) {
+        branch = "main";
+    }
+    return branch;
+}
+
+export function getClientName() {
+    let name = getMyArgument("git_client_name");
+    if(!name) {
+        name = "이름없음"
+    }
+    return name;
 }

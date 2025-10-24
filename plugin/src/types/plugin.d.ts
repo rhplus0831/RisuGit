@@ -1,3 +1,2 @@
 declare function getDatabase(): any;
-
-declare function getArg(key: string): string;
+declare function setDatabase(data: any): void;

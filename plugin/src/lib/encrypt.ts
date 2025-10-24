@@ -149,10 +149,11 @@ async function decryptStrings(obj: any, key: any, iv: BufferSource): Promise<any
 }
 
 // 메인 실행 코드 (암호화)
-export async function processCharacters() {
-    const dbData = getDatabase();
-    const characters = dbData.characters;
-
+export async function processCharacters(characters: any = null) {
+    if(characters == null) {
+        const dbData = getDatabase();
+        characters = dbData.characters;
+    }
     // 'test' 문자열로 암호화 키 생성
     const encryptionKey = await deriveKey('test');
 

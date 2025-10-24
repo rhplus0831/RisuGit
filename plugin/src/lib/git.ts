@@ -1,8 +1,8 @@
 import git, {ReadCommitResult} from "isomorphic-git";
 import http from 'isomorphic-git/http/web';
 import {ensureScriptLoaded} from "./script-loader";
-import {processCharacters} from "./encrypt";
-import {getGitId, getGitPassword, getGitProxy, getGitURL} from "./configure";
+import {decryptCharacters, processCharacters} from "./encrypt";
+import {getBranch, getClientName, getGitId, getGitPassword, getGitProxy, getGitURL} from "./configure";
 
 // LightningFS 스크립트 URL
 const LIGHTNING_FS_URL = "https://unpkg.com/@isomorphic-git/lightning-fs";
@@ -17,6 +17,30 @@ async function getFs() {
     // LightningFS 스크립트가 로드되었는지 확인하고, 아니면 로드합니다.
     await ensureScriptLoaded(LIGHTNING_FS_URL);
 
+    // window.LightningFS가 정의될 때까지 폴링합니다.
+    // @ts-ignore
+    if (typeof window.LightningFS === 'undefined') {
+        await new Promise<void>((resolve, reject) => {
+            const timeout = 5000; // 5초 타임아웃
+            const interval = 100; // 100ms 간격
+            let elapsed = 0;
+
+            const timer = setInterval(() => {
+                // @ts-ignore
+                if (typeof window.LightningFS !== 'undefined') {
+                    clearInterval(timer);
+                    resolve();
+                } else {
+                    elapsed += interval;
+                    if (elapsed >= timeout) {
+                        clearInterval(timer);
+                        reject(new Error("LightningFS loaded but not found on window object after timeout."));
+                    }
+                }
+            }, interval);
+        });
+    }
+
     // 스크립트가 로드된 후에는 window.LightningFS가 확실히 존재합니다.
     // @ts-ignore
     const LightningFS = window.LightningFS;
@@ -30,9 +54,6 @@ async function getFs() {
     return fs;
 }
 
-// @ts-ignore - LightningFS는 브라우저 환경에서 전역으로 로드됨
-const LightningFS = window.FS;
-
 // Git 저장소 초기화 또는 확인 (이제 getFs가 비동기이므로 async/await 처리)
 async function ensureGitRepo(dir: string = '/risudata') {
     const currentFs = await getFs(); // await를 사용하여 fs 인스턴스를 가져옵니다.
@@ -43,7 +64,7 @@ async function ensureGitRepo(dir: string = '/risudata') {
     } catch (err) {
         console.log('Initializing new git repository');
         await currentFs.promises.mkdir(dir, {recursive: true});
-        await git.init({fs: currentFs, dir, defaultBranch: 'main'});
+        await git.init({fs: currentFs, dir, defaultBranch: getBranch()});
         return false;
     }
 }
@@ -77,7 +98,7 @@ export async function saveAndCommit(filename: string = 'data.json', message: str
                 dir,
                 message,
                 author: {
-                    name: 'Risu User',
+                    name: getClientName(),
                     email: 'user@risu.app'
                 }
             });
@@ -148,22 +169,42 @@ export async function getCommitHistory(dir: string = '/risudata'): Promise<ReadC
     }
 }
 
-export async function pushRepository() {
+export async function getFileContentAtCommit(sha: string, filename: string): Promise<any | null> {
+    const dir = '/risudata';
+    const currentFs = await getFs();
     try {
-        const dir = '/risudata'
-        const remote = 'origin'
-        const branch = 'main'
-        const url = getGitURL()
+        const {blob} = await git.readBlob({
+            fs: currentFs,
+            dir,
+            oid: sha,
+            filepath: filename
+        });
+        const content = new TextDecoder('utf-8').decode(blob);
+        return JSON.parse(content);
+    } catch (e: any) {
+        if (e.code === 'NotFoundError') {
+            console.log(`File '${filename}' not found at commit '${sha}'.`);
+            return null;
+        }
+        console.error(`Error reading file '${filename}' at commit '${sha}':`, e);
+        throw e;
+    }
+}
 
-        const currentFs = await getFs();
+export async function pushRepository() {
+    const dir = '/risudata'
+    const remote = 'origin'
+    const branch = getBranch()
+    const url = getGitURL()
+    const currentFs = await getFs();
+
+    try {
         await ensureGitRepo(dir);
 
-        // Check if remote exists. If not, add it.
-        const remotes = await git.listRemotes({ fs: currentFs, dir });
-        if (!remotes.find(r => r.remote === remote)) {
-            await git.addRemote({ fs: currentFs, dir, remote, url });
-            console.log(`Added remote '${remote}' with url '${url}'`);
-        }
+        console.log(`Push to: ${url}`)
+
+        // push를 할 때마다 URL을 강제로 설정하여 최신 상태를 유지합니다.
+        await git.addRemote({fs: currentFs, dir, remote, url, force: true});
 
         const result = await git.push({
             fs: currentFs,
@@ -172,7 +213,7 @@ export async function pushRepository() {
             corsProxy: getGitProxy(),
             remote,
             ref: branch,
-            onAuth: () => ({ username: getGitId(), password: getGitPassword() }),
+            onAuth: () => ({username: getGitId(), password: getGitPassword()}),
         });
 
         if (result.ok) {
@@ -183,8 +224,157 @@ export async function pushRepository() {
             // It's better to throw an error with the message
             throw new Error(`Push failed: ${result.error}`);
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error pushing repository:', error);
+        throw error;
+    }
+}
+
+export async function getRemoteDiff() {
+    const dir = '/risudata'
+    const remote = 'origin'
+    const branch = getBranch()
+    const url = getGitURL()
+    const currentFs = await getFs();
+
+    // push를 할 때마다 URL을 강제로 설정하여 최신 상태를 유지합니다.
+    await git.addRemote({fs: currentFs, dir, remote, url, force: true});
+
+    await git.fetch({
+        fs: currentFs,
+        http,
+        dir,
+        corsProxy: getGitProxy(),
+        remote,
+        ref: branch,
+        onAuth: () => ({username: getGitId(), password: getGitPassword()}),
+    });
+
+    const localSha = await git.resolveRef({fs: currentFs, dir, ref: branch});
+    const remoteSha = await git.resolveRef({fs: currentFs, dir, ref: `refs/remotes/${remote}/${branch}`});
+
+    console.log(`Local SHA: ${localSha}, Remote SHA: ${remoteSha}`);
+
+    // 충돌하는 'data.json' 파일의 내용 가져오기
+    const localData = await getFileContentAtCommit(localSha, 'data.json');
+    const remoteData = await getFileContentAtCommit(remoteSha, 'data.json');
+
+    const localDecrypt = await decryptCharacters(localData)
+    const remoteDecrypt = await decryptCharacters(remoteData)
+
+    return {
+        "localData": localDecrypt,
+        "remoteData": remoteDecrypt
+    }
+}
+
+export async function pullRepository() {
+    try {
+        const dir = '/risudata';
+        const remote = 'origin';
+        const branch = getBranch();
+        const url = getGitURL();
+
+        const currentFs = await getFs();
+        await ensureGitRepo(dir);
+
+        console.log(`Pulling from: ${url}`);
+
+        await git.addRemote({fs: currentFs, dir, remote, url, force: true});
+
+        // 로컬 브랜치가 존재하는지 확인합니다.
+        let localBranchExists = true;
+        try {
+            // resolveRef는 ref가 없으면 에러를 던집니다.
+            await git.resolveRef({fs: currentFs, dir, ref: branch});
+        } catch (e: any) {
+            if (e.code === 'NotFoundError') {
+                localBranchExists = false;
+            } else {
+                throw e; // 다른 종류의 에러는 다시 던집니다.
+            }
+        }
+
+        if (localBranchExists) {
+            // 브랜치가 존재하면, 변경사항을 pull 합니다.
+            console.log(`Local branch '${branch}' exists. Pulling changes.`);
+            await git.pull({
+                fs: currentFs,
+                http,
+                dir,
+                ref: branch,
+                singleBranch: true,
+                corsProxy: getGitProxy(),
+                onAuth: () => ({username: getGitId(), password: getGitPassword()}),
+                author: {
+                    name: getClientName(),
+                    email: 'user@risu.app'
+                }
+            });
+        } else {
+            // 브랜치가 없으면, 원격 저장소에서 fetch 하고 checkout 합니다 (클론과 유사).
+            console.log(`Local branch '${branch}' not found. Fetching and checking out.`);
+            await git.fetch({
+                fs: currentFs,
+                http,
+                dir,
+                remote,
+                ref: branch,
+                singleBranch: true,
+                corsProxy: getGitProxy(),
+                onAuth: () => ({username: getGitId(), password: getGitPassword()}),
+            });
+            // 원격 브랜치를 추적하는 로컬 브랜치를 생성하고 checkout 합니다.
+            await git.checkout({
+                fs: currentFs,
+                dir,
+                ref: branch,
+                remote
+            });
+        }
+
+        console.log(`Successfully updated from ${remote}/${branch}.`);
+
+    } catch (error) {
+        console.error('Error pulling repository:', error);
+        throw error;
+    }
+}
+
+export async function saveMergeCommit(message: string = `Merge remote changes`, data: any[]): Promise<string | null> {
+    const dir = '/risudata';
+    const filename = 'data.json';
+    const branch = getBranch();
+    const remote = 'origin';
+
+    try {
+        const currentFs = await getFs();
+        await ensureGitRepo(dir);
+
+        const filepath = `${dir}/${filename}`;
+        await currentFs.promises.writeFile(filepath, JSON.stringify(data, null, 2), 'utf8');
+        await git.add({fs: currentFs, dir, filepath: filename});
+
+        // 병합 커밋을 위한 부모 커밋 SHA 가져오기
+        const localSha = await git.resolveRef({fs: currentFs, dir, ref: branch});
+        const remoteSha = await git.resolveRef({fs: currentFs, dir, ref: `refs/remotes/${remote}/${branch}`});
+
+        const sha = await git.commit({
+            fs: currentFs,
+            dir,
+            message,
+            parent: [localSha, remoteSha], // 두 개의 부모를 지정하여 병합 커밋 생성
+            author: {
+                name: getClientName(),
+                email: 'user@risu.app'
+            }
+        });
+
+        console.log(`Committed merge with new changes:`, sha);
+        return sha;
+
+    } catch (error) {
+        console.error('Error saving merge commit:', error);
         throw error;
     }
 }

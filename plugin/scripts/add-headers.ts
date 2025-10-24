@@ -4,12 +4,14 @@ import * as path from 'path';
 function main() {
     const filePath = path.join(__dirname, "..", "dist", "index.js")
     const content = fs.readFileSync(filePath, 'utf-8');
-    const header = `//@name _GitRisu
+    const header = `//@name RisuGit
 //@display-name RisuGit
-//@arg risu_git_url string
-//@arg risu_git_id string
-//@arg risu_git_password string
-//@arg risu_git_proxy string
+//@arg git_url string
+//@arg git_id string
+//@arg git_password string
+//@arg git_proxy string
+//@arg git_branch string
+//@arg git_client_name string
 
 `
     const newContent = `${header}\n\n${content}`;

@@ -7,8 +7,9 @@ function main() {
     const header = `//@name _GitRisu
 //@display-name RisuGit
 //@arg risu_git_url string
-//@arg risu_git_token string
-//@arg risu_git_branch string
+//@arg risu_git_id string
+//@arg risu_git_password string
+//@arg risu_git_proxy string
 
 `
     const newContent = `${header}\n\n${content}`;

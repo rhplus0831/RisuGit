@@ -2,7 +2,7 @@ import git, {ReadCommitResult} from "isomorphic-git";
 import http from 'isomorphic-git/http/web';
 import {ensureScriptLoaded} from "./script-loader";
 import {processCharacters} from "./encrypt";
-import {getGitId, getGitPassword, getGitURL} from "./configure";
+import {getGitId, getGitPassword, getGitProxy, getGitURL} from "./configure";
 
 // LightningFS 스크립트 URL
 const LIGHTNING_FS_URL = "https://unpkg.com/@isomorphic-git/lightning-fs";
@@ -32,8 +32,6 @@ async function getFs() {
 
 // @ts-ignore - LightningFS는 브라우저 환경에서 전역으로 로드됨
 const LightningFS = window.FS;
-// TODO: Change it.
-const cors = 'https://cors.isomorphic-git.org'
 
 // Git 저장소 초기화 또는 확인 (이제 getFs가 비동기이므로 async/await 처리)
 async function ensureGitRepo(dir: string = '/risudata') {
@@ -171,7 +169,7 @@ export async function pushRepository() {
             fs: currentFs,
             http,
             dir,
-            corsProxy: cors,
+            corsProxy: getGitProxy(),
             remote,
             ref: branch,
             onAuth: () => ({ username: getGitId(), password: getGitPassword() }),

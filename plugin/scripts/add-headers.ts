@@ -6,6 +6,7 @@ function main() {
     const content = fs.readFileSync(filePath, 'utf-8');
     const header = `//@name RisuGit
 //@display-name RisuGit
+//@arg encrypt_key string
 //@arg git_url string
 //@arg git_id string
 //@arg git_password string

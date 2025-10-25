@@ -2,6 +2,7 @@
 declare const process: {
     env: {
         NODE_ENV: 'development' | 'production';
+        RISU_ENCRYPT_KEY: string;
         RISU_GIT_URL: string;
         RISU_GIT_ID: string;
         RISU_GIT_PASSWORD: string;
@@ -15,37 +16,54 @@ function getMyArgument(name: string) {
     return globalThis.__pluginApis__.getArg(`RisuGit::${name}`)
 }
 
+export function getEncryptKey() {
+    const value = getMyArgument("encrypt_key");
+    if (value) return value;
+    if (process.env.NODE_ENV === 'development') {
+        return process.env.RISU_ENCRYPT_KEY;
+    }
+    return "";
+}
+
 export function getGitURL() {
+    const value = getMyArgument("git_url");
+    if (value) return value;
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_URL;
     }
-    return getMyArgument("git_url");
+    return ""
 }
 
 export function getGitId() {
+    const value = getMyArgument("git_id");
+    if (value) return value;
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_ID;
     }
-    return getMyArgument("git_id");
+    return "";
 }
 
 export function getGitPassword() {
+    const value = getMyArgument("git_password");
+    if (value) return value;
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_PASSWORD;
     }
-    return getMyArgument("git_password");
+    return "";
 }
 
 export function getGitProxy() {
+    const value = getMyArgument("git_password");
+    if (value) return value;
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_PROXY;
     }
-    return getMyArgument("git_proxy");
+    return "";
 }
 
 export function getBranch() {
     let branch = getMyArgument("git_branch");
-    if(!branch) {
+    if (!branch) {
         branch = "main";
     }
     return branch;
@@ -53,7 +71,7 @@ export function getBranch() {
 
 export function getClientName() {
     let name = getMyArgument("git_client_name");
-    if(!name) {
+    if (!name) {
         name = "이름없음"
     }
     return name;

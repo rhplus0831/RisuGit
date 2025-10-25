@@ -1,7 +1,7 @@
 import git, {ReadCommitResult} from "isomorphic-git";
 import http from 'isomorphic-git/http/web';
 import {ensureScriptLoaded} from "./script-loader";
-import {decryptCharacters, processCharacters} from "./encrypt";
+import {decryptDatabase, EncryptDatabase, encryptDatabase} from "./encrypt";
 import {getBranch, getClientName, getGitId, getGitPassword, getGitProxy, getGitURL} from "./configure";
 
 // LightningFS 스크립트 URL
@@ -71,7 +71,7 @@ async function ensureGitRepo(dir: string = '/risudata') {
 
 export async function saveAndCommit(filename: string = 'data.json', message: string = 'Save data'): Promise<string | null> {
     const dir = '/risudata';
-    const data = await processCharacters()
+    const data = await encryptDatabase()
 
     try {
         const currentFs = await getFs(); // await를 사용하여 fs 인스턴스를 가져옵니다.
@@ -259,12 +259,9 @@ export async function getRemoteDiff() {
     const localData = await getFileContentAtCommit(localSha, 'data.json');
     const remoteData = await getFileContentAtCommit(remoteSha, 'data.json');
 
-    const localDecrypt = await decryptCharacters(localData)
-    const remoteDecrypt = await decryptCharacters(remoteData)
-
     return {
-        "localData": localDecrypt,
-        "remoteData": remoteDecrypt
+        "localData": localData,
+        "remoteData": remoteData
     }
 }
 
@@ -341,7 +338,7 @@ export async function pullRepository() {
     }
 }
 
-export async function saveMergeCommit(message: string = `Merge remote changes`, data: any[]): Promise<string | null> {
+export async function saveMergeCommit(message: string = `Merge remote changes`, data: EncryptDatabase): Promise<string | null> {
     const dir = '/risudata';
     const filename = 'data.json';
     const branch = getBranch();

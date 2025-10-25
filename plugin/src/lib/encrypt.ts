@@ -1,12 +1,55 @@
-// 전역 인코더/디코더 재사용
+// 인코더 캐싱
+import {getEncryptKey} from "./configure";
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-let derivedKeyPromise: Promise<CryptoKey> | null = null;
+const testValue = "risu-git-is-awesome-i-dont-know-but-it-is-long-string-for-test-toooooooooooooooooooooooooooooooo-long";
 
-// 키를 암호화 키로 변환하는 함수
+/**
+ * 암호화 해제된 데이터베이스
+ */
+export interface DecryptedDatabase {
+    characters: any[];
+    characterOrder: any[];
+    loreBook: any[];
+    personas: any[];
+    modules: any[];
+    statics: any;
+    statistics: any;
+    botPresets: any[];
+    // banCharacterset: any[]; 캐릭터 데이터가 아니였어
+}
+
+/**
+ * 원본 데이터베이스에서 필요한 부분을 자른 사본을 반환
+ */
+export function getDecryptDatabase(): DecryptedDatabase {
+    const database = getDatabase();
+    return JSON.parse(JSON.stringify({
+        characters: database.characters,
+        characterOrder: database.characterOrder
+    }))
+}
+
+/**
+ * 암호화된 데이터 베이스
+ */
+export interface EncryptDatabase extends DecryptedDatabase {
+    decryptTest: string
+}
+
+// 한번 만든 키는 잘 변하지 않으므로 캐싱
+let derivedKeyPromise: Promise<CryptoKey> | null = null;
+let cachedPassword: string | null = null;
+
+/**
+ * 패스워드를 키로 변환
+ * @param password 패스워드
+ */
 async function deriveKey(password: string) {
-    if (!derivedKeyPromise) {
+    if (!derivedKeyPromise || !cachedPassword || cachedPassword != password) {
+        cachedPassword = password
         const keyMaterial = await crypto.subtle.importKey(
             'raw',
             textEncoder.encode(password),
@@ -15,14 +58,13 @@ async function deriveKey(password: string) {
             ['deriveBits', 'deriveKey']
         );
 
-        // 고정된 salt 사용 (결정론적 결과를 위해)
-        const salt = textEncoder.encode('fixed-salt-for-deterministic');
+        const salt = textEncoder.encode("risu-git-" + password);
 
         derivedKeyPromise = crypto.subtle.deriveKey(
             {
                 name: 'PBKDF2',
                 salt,
-                iterations: 10000,
+                iterations: 600000,
                 hash: 'SHA-256',
             },
             keyMaterial,
@@ -34,9 +76,19 @@ async function deriveKey(password: string) {
     return derivedKeyPromise;
 }
 
-async function uuidToIV(uuid: string): Promise<Uint8Array> {
+/**
+ * Uint8Array를 생성하고 crypto.getRandomValues()로 안전한 랜덤 데이터를 채워 IV 값을 만듭니다.
+ */
+function generateRandomIV(length: number = 12): Uint8Array {
+    const iv = new Uint8Array(length);
+    crypto.getRandomValues(iv);
+    return iv;
+}
+
+async function stringToIV(stringData: string): Promise<Uint8Array> {
     const encoder = new TextEncoder();
-    const data = encoder.encode(uuid);
+    // add header
+    const data = encoder.encode("risu-git-" + stringData);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     // Ensure iv has an ArrayBuffer (not ArrayBufferLike)
     const iv = new Uint8Array(12);
@@ -72,50 +124,46 @@ function base64ToUint8(b64: string): Uint8Array {
 }
 
 // 문자열을 암호화하는 함수
-async function encryptString(text: string, key: CryptoKey, iv: BufferSource): Promise<string> {
+async function encryptString(text: string, key: CryptoKey, iv: BufferSource | null = null): Promise<string> {
     const data = textEncoder.encode(text);
-    const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+    if (!iv) {
+        iv = (await stringToIV(text)) as BufferSource
+    }
+    const encrypted = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, key, data);
     const b64 = uint8ToBase64(new Uint8Array(encrypted));
-    return `enc:${b64}`;
+    const ivB64 = uint8ToBase64(new Uint8Array(iv as Uint8Array));
+    return `enc::${ivB64}::${b64}`;
 }
 
 // 문자열을 복호화하는 함수
-async function decryptString(encryptedText: string, key: CryptoKey, iv: BufferSource): Promise<string> {
-    if (!encryptedText.startsWith('enc:')) return encryptedText;
-    const b64 = encryptedText.slice(4);
-    try {
-        const encryptedData = base64ToUint8(b64);
-        if (encryptedData.length < 17) return encryptedText;
-        const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encryptedData as BufferSource);
-        return textDecoder.decode(decrypted);
-    } catch {
-        return encryptedText;
-    }
+async function decryptString(encryptedText: string, key: CryptoKey): Promise<string> {
+    if (!encryptedText.startsWith('enc::')) return encryptedText;
+    const split = encryptedText.split("::")
+    const ivB64 = split[1]
+    const iv = base64ToUint8(ivB64) as BufferSource;
+    const b64 = split[2]
+    const encryptedData = base64ToUint8(b64);
+    const decrypted = await crypto.subtle.decrypt({name: 'AES-GCM', iv}, key, encryptedData as BufferSource);
+    return textDecoder.decode(decrypted);
 }
 
 // 재귀적으로 객체를 순회하며 32자 이상의 문자열 암호화
-async function encryptLongStrings(obj: any, key: any, iv: BufferSource): Promise<any> {
+async function encryptValuesRecursively(obj: any, key: any): Promise<any> {
     if (typeof obj === 'string') {
-        if (obj.length >= 32) {
-            // 암호화 결과를 반환해야 함
-            return await encryptString(obj, key, iv);
-        }
-        return obj;
+        return await encryptString(obj, key);
     } else if (Array.isArray(obj)) {
         const result = [];
         for (const item of obj) {
-            result.push(await encryptLongStrings(item, key, iv));
+            result.push(await encryptValuesRecursively(item, key));
         }
         return result;
     } else if (obj !== null && typeof obj === 'object') {
         const result: any = {};
         for (const [key_name, value] of Object.entries(obj)) {
-            if (key_name === "chaId") {
-                result[key_name] = value;
-            } else if (typeof value === 'string' && value.length >= 32) {
-                result[key_name] = await encryptString(value, key, iv);
+            if (typeof value === 'string' && value.length >= 32) {
+                result[key_name] = await encryptString(value, key);
             } else {
-                result[key_name] = await encryptLongStrings(value, key, iv);
+                result[key_name] = await encryptValuesRecursively(value, key);
             }
         }
         return result;
@@ -124,23 +172,23 @@ async function encryptLongStrings(obj: any, key: any, iv: BufferSource): Promise
 }
 
 // 재귀적으로 객체를 순회하며 암호화된 문자열 복호화
-async function decryptStrings(obj: any, key: any, iv: BufferSource): Promise<any> {
+async function decryptValuesRecursively(obj: any, key: any): Promise<any> {
     if (typeof obj === 'string') {
         // 문자열일 때만, 접두사가 있을 때만 복호화
-        return await decryptString(obj, key, iv);
+        return await decryptString(obj, key);
     } else if (Array.isArray(obj)) {
         const result = [];
         for (const item of obj) {
-            result.push(await decryptStrings(item, key, iv));
+            result.push(await decryptValuesRecursively(item, key));
         }
         return result;
     } else if (obj !== null && typeof obj === 'object') {
         const result: any = {};
         for (const [key_name, value] of Object.entries(obj)) {
             if (typeof value === 'string') {
-                result[key_name] = await decryptString(value, key, iv);
+                result[key_name] = await decryptString(value, key);
             } else {
-                result[key_name] = await decryptStrings(value, key, iv);
+                result[key_name] = await decryptValuesRecursively(value, key);
             }
         }
         return result;
@@ -149,55 +197,70 @@ async function decryptStrings(obj: any, key: any, iv: BufferSource): Promise<any
 }
 
 // 메인 실행 코드 (암호화)
-export async function processCharacters(characters: any = null) {
-    if(characters == null) {
-        const dbData = getDatabase();
-        characters = dbData.characters;
+export async function encryptDatabase(database: any | null = null, salt: string | null = null) {
+    if (database == null) {
+        database = getDatabase(); //여기서 수정을 하지 않으니 데이터베이스를 그대로 얻어옴
     }
-    // 'test' 문자열로 암호화 키 생성
-    const encryptionKey = await deriveKey('test');
+    const encryptionKey = await deriveKey(getEncryptKey());
 
-    const encryptedCharacters = [];
+    // 문자열을 넣으면 반드시 문자열이 나옴
+    const testData = await encryptString(testValue, encryptionKey)
 
-    for (const character of characters) {
-        // character는 dict type data
-        const iv = await uuidToIV(character["chaId"])
-
-        const encryptedCharacter = await encryptLongStrings(character, encryptionKey, iv as BufferSource);
-        encryptedCharacters.push(encryptedCharacter);
+    const encryptedDatabase: EncryptDatabase = {
+        characters: await encryptValuesRecursively(database.characters, encryptionKey),
+        characterOrder: await encryptValuesRecursively(database.characterOrder, encryptionKey),
+        botPresets: await encryptValuesRecursively(database.botPresets, encryptionKey),
+        personas: await encryptValuesRecursively(database.personas, encryptionKey),
+        loreBook: await encryptValuesRecursively(database.loreBook, encryptionKey),
+        modules: await encryptValuesRecursively(database.modules, encryptionKey),
+        statics: await encryptValuesRecursively(database.statics, encryptionKey),
+        statistics: await encryptValuesRecursively(database.statistics, encryptionKey),
+        decryptTest: testData,
     }
 
-    return encryptedCharacters;
+    return encryptedDatabase;
 }
 
 // 복호화 예시
-export async function decryptCharacters(encryptedCharacters: any[]) {
-    const encryptionKey = await deriveKey('test');
+export async function decryptDatabase(encryptedDatabase: EncryptDatabase): Promise<DecryptedDatabase> {
+    const encryptionKey = await deriveKey(getEncryptKey());
 
-    const decryptedCharacters = [];
-
-    for (const character of encryptedCharacters) {
-        const iv = await uuidToIV(character["chaId"]);
-        const decryptedCharacter = await decryptStrings(character, encryptionKey, iv as BufferSource);
-        decryptedCharacters.push(decryptedCharacter);
+    let testData = "";
+    try {
+        testData = await decryptString(encryptedDatabase.decryptTest, encryptionKey);
+    } catch {
+        throw new Error("암호화 키가 다르거나 데이터가 손상되었습니다.")
     }
 
-    return decryptedCharacters;
+    if (testData != testValue) {
+        throw new Error("암호화 키가 다르거나 데이터가 손상되었습니다.")
+    }
+
+    return {
+        characters: await decryptValuesRecursively(encryptedDatabase.characters, encryptionKey),
+        characterOrder: await decryptValuesRecursively(encryptedDatabase.characterOrder, encryptionKey),
+        statistics: await decryptValuesRecursively(encryptedDatabase.statistics, encryptionKey),
+        statics: await decryptValuesRecursively(encryptedDatabase.statics, encryptionKey),
+        modules: await decryptValuesRecursively(encryptedDatabase.modules, encryptionKey),
+        loreBook: await decryptValuesRecursively(encryptedDatabase.loreBook, encryptionKey),
+        personas: await decryptValuesRecursively(encryptedDatabase.personas, encryptionKey),
+        botPresets: await decryptValuesRecursively(encryptedDatabase.botPresets, encryptionKey)
+    };
 }
 
 // 사용 예시
 async function example() {
     // 암호화
-    const t0 = (globalThis.performance ?? { now: () => Date.now() }).now();
-    const encrypted = await processCharacters();
-    const t1 = (globalThis.performance ?? { now: () => Date.now() }).now();
+    const t0 = (globalThis.performance ?? {now: () => Date.now()}).now();
+    const encrypted = await encryptDatabase();
+    const t1 = (globalThis.performance ?? {now: () => Date.now()}).now();
     console.log(`암호화 시간: ${(t1 - t0).toFixed(2)} ms`);
     console.log('암호화 완료:', encrypted);
 
     // 복호화
-    const t2 = (globalThis.performance ?? { now: () => Date.now() }).now();
-    const decrypted = await decryptCharacters(encrypted);
-    const t3 = (globalThis.performance ?? { now: () => Date.now() }).now();
+    const t2 = (globalThis.performance ?? {now: () => Date.now()}).now();
+    const decrypted = await decryptDatabase(encrypted);
+    const t3 = (globalThis.performance ?? {now: () => Date.now()}).now();
     console.log(`복호화 시간: ${(t3 - t2).toFixed(2)} ms`);
     console.log('복호화 완료:', decrypted);
 }

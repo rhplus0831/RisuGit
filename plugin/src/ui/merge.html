@@ -1,43 +1,31 @@
 <!-- This is for an overlay(element injection) that wrapped by external system, so HTML and body tags doesn't exist -->
-<div class="rg-flex rg-flex-col w-full h-full">
-    <div style="display: none">
-        <div class="rg-opacity-50 rg-border-blue-500 rg-border-2 rg-bg-blue-50"></div>
-        <div id="rg-change-container"
-             class="rg-bg-white rg-p-4 rg-rounded-lg rg-shadow-md rg-border rg-border-gray-300">
-            <div class="change-path rg-mb-4 rg-pb-2 rg-border-b rg-border-gray-200">
-                <strong class="rg-font-semibold">변경 경로:</strong> <code
-                    class="rg-bg-gray-100 rg-px-2 rg-py-1 rg-rounded rg-text-sm" id="rg-change-container-path">${change.path}</code>
-            </div>
-            <div class="change-options rg-flex rg-gap-4">
-                <div class="change-local rg-flex-1 rg-flex rg-flex-col rg-gap-2 rg-p-4 rg-border rg-border-gray-200 rg-rounded-lg">
-                    <h4 class="rg-font-bold rg-text-lg">Local (기기)</h4>
-                    <pre id="rg-change-container-change-local"
-                         class="rg-bg-gray-50 rg-p-2 rg-rounded rg-text-sm rg-overflow-auto rg-flex-1 rg-whitespace-pre-wrap rg-break-all">${change.type === 'added' ? '<i
-                            class="rg-text-gray-500">(값이 없음)</i>' : JSON.stringify(change.oldValue, null, 2)}</pre>
-                    <button data-choice="local"
-                            class="rg-mt-auto rg-bg-blue-500 hover:rg-bg-blue-600 rg-text-white rg-font-bold rg-py-2 rg-px-4 rg-rounded rg-transition-colors">
-                        Local 버전 선택
-                    </button>
-                </div>
-                <div class="change-remote rg-flex-1 rg-flex rg-flex-col rg-gap-2 rg-p-4 rg-border rg-border-gray-200 rg-rounded-lg">
-                    <h4 class="rg-font-bold rg-text-lg">Remote (서버)</h4>
-                    <pre id="rg-change-container-change-remote"
-                         class="rg-bg-gray-50 rg-p-2 rg-rounded rg-text-sm rg-overflow-auto rg-flex-1 rg-whitespace-pre-wrap rg-break-all">${change.type === 'deleted' ? '<i
-                            class="rg-text-gray-500">(값이 없음)</i>' : JSON.stringify(change.newValue, null, 2)}</pre>
-                    <button data-choice="remote"
-                            class="rg-mt-auto rg-bg-green-500 hover:rg-bg-green-600 rg-text-white rg-font-bold rg-py-2 rg-px-4 rg-rounded rg-transition-colors">
-                        Remote 버전 선택
-                    </button>
-                </div>
-            </div>
-        </div>
+<div class="rg-flex rg-flex-col w-full h-full rg-gap-2">
+    <h3 class="rg-font-bold rg-mb-2 rg-flex-0">서버와 데이터 충돌이 있습니다</h3>
+    <span>서버에 올린 데이터와 로컬 데이터간 자동 병합이 불가능한 충돌이 있습니다.</span>
+    <span>어떤 커밋을 고르건 각자의 커밋 데이터는 남으며, 그 시점으로 데이터를 되돌릴 수 있습니다.</span>
+    <div class="rg-w-full rg-flex rg-flex-row rg-gap-2">
+        <button id="rg-merge-local-button"
+                class="rg-flex-1 rg-gap1 rg-justify-center rg-bg-green-500 hover:rg-bg-green-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded rg-flex rg-flex-row">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 class="lucide lucide-hard-drive-icon lucide-hard-drive">
+                <line x1="22" x2="2" y1="12" y2="12"/>
+                <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+                <line x1="6" x2="6.01" y1="16" y2="16"/>
+                <line x1="10" x2="10.01" y1="16" y2="16"/>
+            </svg>
+            로컬의 데이터를 사용하기
+        </button>
+        <button id="rg-merge-remote-button"
+                class="rg-flex-1 rg-gap1 rg-justify-center rg-bg-blue-500 hover:rg-bg-blue-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded rg-flex rg-flex-row">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 class="lucide lucide-cloud-icon lucide-cloud">
+                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+            </svg>
+            서버의 데이터를 사용하기
+        </button>
     </div>
-    <h3 class="rg-font-bold rg-mb-2 rg-flex-0">변경점 머지</h3>
-    <div id="rg-json-diff-output" class="rg-flex-1 rg-flex rg-flex-col rg-gap-4">불러오는중...</div>
-    <button id="rg-merge-merge-button"
-            class="rg-hidden rg-bg-green-500 hover:rg-bg-green-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded">선택한대로
-        머지하기
-    </button>
     <button id="rg-merge-close-button"
             class="rg-bg-red-500 hover:rg-bg-red-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded">취소하기
     </button>

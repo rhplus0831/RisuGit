@@ -1,7 +1,10 @@
-import { Buffer } from 'buffer';
+import {Buffer} from 'buffer';
+
 globalThis.Buffer = Buffer;
 
 export * from './lib/encrypt';
 export * from './lib/buttonInjection'
 
-// console.log(getDatabase())
+if (process.env.NODE_ENV === 'development') {
+    console.log(JSON.parse(JSON.stringify(getDatabase())))
+}

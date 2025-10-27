@@ -6,39 +6,6 @@ const textDecoder = new TextDecoder();
 
 const testValue = "risu-git-is-awesome-i-dont-know-but-it-is-long-string-for-test-toooooooooooooooooooooooooooooooo-long";
 
-/**
- * 암호화 해제된 데이터베이스
- */
-export interface DecryptedDatabase {
-    characters: any[];
-    characterOrder: any[];
-    loreBook: any[];
-    personas: any[];
-    modules: any[];
-    statics: any;
-    statistics: any;
-    botPresets: any[];
-    // banCharacterset: any[]; 캐릭터 데이터가 아니였어
-}
-
-/**
- * 원본 데이터베이스에서 필요한 부분을 자른 사본을 반환
- */
-export function getDecryptDatabase(): DecryptedDatabase {
-    const database = getDatabase();
-    return JSON.parse(JSON.stringify({
-        characters: database.characters,
-        characterOrder: database.characterOrder
-    }))
-}
-
-/**
- * 암호화된 데이터 베이스
- */
-export interface EncryptDatabase extends DecryptedDatabase {
-    decryptTest: string
-}
-
 // 한번 만든 키는 잘 변하지 않으므로 캐싱
 let derivedKeyPromise: Promise<CryptoKey> | null = null;
 let cachedPassword: string | null = null;
@@ -47,7 +14,7 @@ let cachedPassword: string | null = null;
  * 패스워드를 키로 변환
  * @param password 패스워드
  */
-async function deriveKey(password: string) {
+export async function deriveKey(password: string) {
     if (!derivedKeyPromise || !cachedPassword || cachedPassword != password) {
         cachedPassword = password
         const keyMaterial = await crypto.subtle.importKey(
@@ -74,15 +41,6 @@ async function deriveKey(password: string) {
         );
     }
     return derivedKeyPromise;
-}
-
-/**
- * Uint8Array를 생성하고 crypto.getRandomValues()로 안전한 랜덤 데이터를 채워 IV 값을 만듭니다.
- */
-function generateRandomIV(length: number = 12): Uint8Array {
-    const iv = new Uint8Array(length);
-    crypto.getRandomValues(iv);
-    return iv;
 }
 
 async function stringToIV(stringData: string): Promise<Uint8Array> {
@@ -124,7 +82,7 @@ function base64ToUint8(b64: string): Uint8Array {
 }
 
 // 문자열을 암호화하는 함수
-async function encryptString(text: string, key: CryptoKey, iv: BufferSource | null = null): Promise<string> {
+export async function encryptString(text: string, key: CryptoKey, iv: BufferSource | null = null): Promise<string> {
     const data = textEncoder.encode(text);
     if (!iv) {
         iv = (await stringToIV(text)) as BufferSource
@@ -136,7 +94,7 @@ async function encryptString(text: string, key: CryptoKey, iv: BufferSource | nu
 }
 
 // 문자열을 복호화하는 함수
-async function decryptString(encryptedText: string, key: CryptoKey): Promise<string> {
+export async function decryptString(encryptedText: string, key: CryptoKey): Promise<string> {
     if (!encryptedText.startsWith('enc::')) return encryptedText;
     const split = encryptedText.split("::")
     const ivB64 = split[1]
@@ -148,7 +106,7 @@ async function decryptString(encryptedText: string, key: CryptoKey): Promise<str
 }
 
 // 재귀적으로 객체를 순회하며 32자 이상의 문자열 암호화
-async function encryptValuesRecursively(obj: any, key: any): Promise<any> {
+export async function encryptValuesRecursively(obj: any, key: CryptoKey): Promise<any> {
     if (typeof obj === 'string') {
         return await encryptString(obj, key);
     } else if (Array.isArray(obj)) {
@@ -172,7 +130,7 @@ async function encryptValuesRecursively(obj: any, key: any): Promise<any> {
 }
 
 // 재귀적으로 객체를 순회하며 암호화된 문자열 복호화
-async function decryptValuesRecursively(obj: any, key: any): Promise<any> {
+export async function decryptValuesRecursively(obj: any, key: any): Promise<any> {
     if (typeof obj === 'string') {
         // 문자열일 때만, 접두사가 있을 때만 복호화
         return await decryptString(obj, key);
@@ -195,78 +153,5 @@ async function decryptValuesRecursively(obj: any, key: any): Promise<any> {
     }
     return obj;
 }
-
-// 메인 실행 코드 (암호화)
-export async function encryptDatabase(database: any | null = null, salt: string | null = null) {
-    if (database == null) {
-        database = getDatabase(); //여기서 수정을 하지 않으니 데이터베이스를 그대로 얻어옴
-    }
-    const encryptionKey = await deriveKey(getEncryptKey());
-
-    // 문자열을 넣으면 반드시 문자열이 나옴
-    const testData = await encryptString(testValue, encryptionKey)
-
-    const encryptedDatabase: EncryptDatabase = {
-        characters: await encryptValuesRecursively(database.characters, encryptionKey),
-        characterOrder: await encryptValuesRecursively(database.characterOrder, encryptionKey),
-        botPresets: await encryptValuesRecursively(database.botPresets, encryptionKey),
-        personas: await encryptValuesRecursively(database.personas, encryptionKey),
-        loreBook: await encryptValuesRecursively(database.loreBook, encryptionKey),
-        modules: await encryptValuesRecursively(database.modules, encryptionKey),
-        statics: await encryptValuesRecursively(database.statics, encryptionKey),
-        statistics: await encryptValuesRecursively(database.statistics, encryptionKey),
-        decryptTest: testData,
-    }
-
-    return encryptedDatabase;
-}
-
-// 복호화 예시
-export async function decryptDatabase(encryptedDatabase: EncryptDatabase): Promise<DecryptedDatabase> {
-    const encryptionKey = await deriveKey(getEncryptKey());
-
-    let testData = "";
-    try {
-        testData = await decryptString(encryptedDatabase.decryptTest, encryptionKey);
-    } catch {
-        throw new Error("암호화 키가 다르거나 데이터가 손상되었습니다.")
-    }
-
-    if (testData != testValue) {
-        throw new Error("암호화 키가 다르거나 데이터가 손상되었습니다.")
-    }
-
-    return {
-        characters: await decryptValuesRecursively(encryptedDatabase.characters, encryptionKey),
-        characterOrder: await decryptValuesRecursively(encryptedDatabase.characterOrder, encryptionKey),
-        statistics: await decryptValuesRecursively(encryptedDatabase.statistics, encryptionKey),
-        statics: await decryptValuesRecursively(encryptedDatabase.statics, encryptionKey),
-        modules: await decryptValuesRecursively(encryptedDatabase.modules, encryptionKey),
-        loreBook: await decryptValuesRecursively(encryptedDatabase.loreBook, encryptionKey),
-        personas: await decryptValuesRecursively(encryptedDatabase.personas, encryptionKey),
-        botPresets: await decryptValuesRecursively(encryptedDatabase.botPresets, encryptionKey)
-    };
-}
-
-// 사용 예시
-async function example() {
-    // 암호화
-    const t0 = (globalThis.performance ?? {now: () => Date.now()}).now();
-    const encrypted = await encryptDatabase();
-    const t1 = (globalThis.performance ?? {now: () => Date.now()}).now();
-    console.log(`암호화 시간: ${(t1 - t0).toFixed(2)} ms`);
-    console.log('암호화 완료:', encrypted);
-
-    // 복호화
-    const t2 = (globalThis.performance ?? {now: () => Date.now()}).now();
-    const decrypted = await decryptDatabase(encrypted);
-    const t3 = (globalThis.performance ?? {now: () => Date.now()}).now();
-    console.log(`복호화 시간: ${(t3 - t2).toFixed(2)} ms`);
-    console.log('복호화 완료:', decrypted);
-}
-
-// example().catch((reason) => {
-//     console.log('Error:', reason);
-// });
 
 export {};

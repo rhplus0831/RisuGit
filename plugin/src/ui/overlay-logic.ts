@@ -1,7 +1,9 @@
 import {BaseOverlay} from "./baseOverlay";
-import {getCommitHistory, getFileContentAtCommit, pullRepository, pushRepository, saveAndCommit} from "../lib/git";
+import {
+    getCommitHistory, getFileContentAtCommit, pullRepository, pushRepository,
+    revertDatabaseToCommit, saveDatabaseAndCommit
+} from "../lib/git";
 import mergeTemplate from './merge.html';
-import {decryptDatabase} from "../lib/encrypt";
 import {applyClickHandlerWithSpinner} from "./loadingButton";
 
 export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivElement) {
@@ -100,12 +102,7 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
                     const shortCommitId = commitId.slice(0, 7);
                     if (confirm(`정말로 이 커밋(${shortCommitId})의 내용을 리스에 적용하시겠습니까?\n만약의 사태를 위해, 일반 백업을 해두는것을 권장합니다.`)) {
                         try {
-                            const fileContent = await getFileContentAtCommit(commitId, 'data.json');
-                            const db = getDatabase()
-                            const decrypted = await decryptDatabase(fileContent);
-                            db.characters = decrypted.characters;
-                            db.characterOrder = decrypted.characterOrder;
-                            setDatabase(db);
+                            await revertDatabaseToCommit(commitId);
                             alert("완료되었습니다, 새로고침을 권장합니다.")
                         } catch (reason) {
                             alert(reason)
@@ -121,7 +118,7 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
 
     applyClickHandlerWithSpinner(commitButton, [commitButton, pushButton, pullButton, closeButton, persistButton], async () => {
         try {
-            const isChanged = await saveAndCommit();
+            const isChanged = await saveDatabaseAndCommit();
             if (!isChanged) {
                 alert('변경 사항이 없습니다!')
             } else {

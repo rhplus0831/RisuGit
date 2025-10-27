@@ -3,7 +3,7 @@ import baseElementTemplate from './baseOverlay.html';
 // overlay.ts
 export class BaseOverlay {
     private element: HTMLDivElement | null = null;
-    private cleanup: (() => void) | null = null;
+    private cleanup: (() => void) | null | undefined = null;
     public extraCleanup: (() => void) | null = null;
 
     async show(html: string, logic: "overlay" | "merge") {

@@ -22,7 +22,6 @@
     "buffer": "^6.0.3",
     "esbuild": "^0.25.11",
     "isomorphic-git": "^1.34.0",
-    "jsondiffpatch": "^0.7.3",
     "tsx": "^4.20.6"
   }
 }

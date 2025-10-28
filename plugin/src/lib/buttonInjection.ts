@@ -3,9 +3,6 @@ import overlayTemplate from '../ui/settings.html';
 import chatTemplate from '../ui/quick.html';
 // @ts-ignore
 import tailwindStyles from '../../dist/main.css';
-// @ts-ignore
-import diffStyles from '../../node_modules/jsondiffpatch/lib/formatters/styles/html.css';
-
 // 주입된 스타일이 중복되지 않도록 한 번만 실행
 (function () {
     let style: HTMLStyleElement | null = document.getElementById('risu-git-styles') as HTMLStyleElement;
@@ -15,14 +12,6 @@ import diffStyles from '../../node_modules/jsondiffpatch/lib/formatters/styles/h
         document.head.appendChild(style);
     }
     style.innerHTML = tailwindStyles;
-
-    let diffStyle: HTMLStyleElement | null = document.getElementById('risu-git-diff-styles') as HTMLStyleElement;
-    if (!diffStyle) {
-        diffStyle = document.createElement('style');
-        diffStyle.id = 'risu-git-diff-styles';
-        document.head.appendChild(diffStyle);
-    }
-    diffStyle.innerHTML = diffStyles;
 })();
 
 function makeMutationObserver(callbacks: (() => void)[], targetNode: HTMLElement | undefined = undefined, config: MutationObserverInit | undefined = undefined) {

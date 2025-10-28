@@ -1,5 +1,5 @@
 import {BaseOverlay} from "./baseOverlay";
-import {getRemoteDiff, pushRepository, saveMergeCommit} from "../lib/git";
+import {pushRepository, mergeCommit} from "../lib/git";
 import {applyClickHandlerWithSpinner} from "./loadingButton";
 
 export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivElement) {
@@ -9,38 +9,34 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
         overlay.close()
     })
 
-    getRemoteDiff().then((data) => {
-        const localMergeButton = container.querySelector<HTMLButtonElement>('#rg-merge-local-button');
-        const remoteMergeButton = container.querySelector<HTMLButtonElement>('#rg-merge-remote-button');
+    const localMergeButton = container.querySelector<HTMLButtonElement>('#rg-merge-local-button');
+    const remoteMergeButton = container.querySelector<HTMLButtonElement>('#rg-merge-remote-button');
 
-        if (!localMergeButton || !remoteMergeButton) {
-            console.log("버튼... 없다?")
-            return;
+    if (!localMergeButton || !remoteMergeButton) {
+        console.log("버튼... 없다?")
+        return;
+    }
+
+    applyClickHandlerWithSpinner(localMergeButton, [localMergeButton, remoteMergeButton], async () => {
+        try {
+            await mergeCommit('Merge changes from local', true);
+            await pushRepository()
+            overlay.close();
+        } catch (e: any) {
+            console.error("Merge commit failed:", e);
+            alert(`병합에 실패했습니다: ${e.message}`);
         }
+    });
 
-        applyClickHandlerWithSpinner(localMergeButton, [localMergeButton, remoteMergeButton], async () => {
-            try {
-                await saveMergeCommit('Merge changes from local', data.localData);
-                await pushRepository()
-                overlay.close();
-            } catch (e: any) {
-                console.error("Merge commit failed:", e);
-                alert(`병합에 실패했습니다: ${e.message}`);
-            }
-        });
-
-        applyClickHandlerWithSpinner(remoteMergeButton, [localMergeButton, remoteMergeButton], async () => {
-            try {
-                await saveMergeCommit('Merge changes from remote', data.remoteData);
-                overlay.close();
-            } catch (e: any) {
-                console.error("Merge commit failed:", e);
-                alert(`병합에 실패했습니다: ${e.message}`);
-            }
-        });
-    }).catch((reason) => {
-        alert(`차이점을 구하는데 실패했습니다: ${reason}`)
-    })
+    applyClickHandlerWithSpinner(remoteMergeButton, [localMergeButton, remoteMergeButton], async () => {
+        try {
+            await mergeCommit('Merge changes from remote', false);
+            overlay.close();
+        } catch (e: any) {
+            console.error("Merge commit failed:", e);
+            alert(`병합에 실패했습니다: ${e.message}`);
+        }
+    });
 
     // 정리 함수 반환
     return () => {

@@ -58,12 +58,71 @@ async function getFs(): Promise<any> {
     return fs;
 }
 
+async function calculateFSUsage(fs: any, dirPath = '/') {
+    let totalSize = 0;
+
+    try {
+        const entries = await fs.promises.readdir(dirPath);
+
+        for (const entry of entries) {
+            const entryPath = dirPath === '/' ? `/${entry}` : `${dirPath}/${entry}`;
+            const stats = await fs.promises.stat(entryPath);
+
+            if (stats.type === 'file') {
+                totalSize += stats.size;
+            } else if (stats.type === 'dir') {
+                totalSize += await calculateFSUsage(fs, entryPath);
+            }
+        }
+    } catch (error) {
+        console.error(`디렉토리(${dirPath}) 읽기 오류:`, error);
+    }
+
+    return totalSize;
+}
+
+export async function getDiskUsage() {
+    let quota: number | undefined = undefined;
+    let usage: number | undefined = undefined;
+    try {
+        const estimate = await navigator.storage.estimate();
+
+        quota = estimate.quota;
+        usage = estimate.usage;
+    } catch (error) {
+        console.error('저장 용량 확인 중 오류 발생:', error);
+    }
+
+    return {
+        quota: quota,
+        usage: usage,
+        fs: await calculateFSUsage(await getFs())
+    }
+}
+
 // Git 저장소 초기화 또는 확인 (이제 getFs가 비동기이므로 async/await 처리)
-async function ensureGitRepo(dir: string = '/risudata') {
+async function ensureGitRepo() {
     const currentFs = await getFs(); // await를 사용하여 fs 인스턴스를 가져옵니다.
     try {
         console.log('Git repository already exists');
         await currentFs.promises.stat(`${dir}/.git`);
+
+        // 복구중 발생했을 수 있는 DETACHED HEAD 상태 방지
+        let branches = await git.listBranches({fs, dir})
+        let branch = await git.currentBranch({
+            fs,
+            dir,
+            fullname: false,
+            test: true
+        })
+        if (branch === undefined && branches.includes(getBranch())) {
+            await git.checkout({
+                fs,
+                dir,
+                ref: getBranch(),
+                force: true
+            });
+        }
         return true;
     } catch (err) {
         console.log('Initializing new git repository');
@@ -103,17 +162,71 @@ async function recursiveRmdir(pfs: any, dir: string) {
     await pfs.promises.rmdir(dir);
 }
 
+export async function deleteRepo() {
+    await recursiveRmdir(await getFs(), '/risudata')
+}
+
+/**
+ * 현재 레포를 지우고 원격에서 깊이를 1로 해서 데이터를 다시 받습니다
+ */
+export async function recloneRepoWithLowDepth() {
+    const currentFs = await getFs();
+    await ensureGitRepo();
+
+    const remote = 'origin'
+    const branch = getBranch()
+
+    await git.addRemote({fs: currentFs, dir, remote, url: getGitURL(), force: true});
+
+    // 로컬 브랜치가 존재하는지 확인합니다.
+    let localBranchExists = true;
+    try {
+        // resolveRef는 ref가 없으면 에러를 던집니다.
+        await git.resolveRef({fs: currentFs, dir, ref: branch});
+    } catch (e: any) {
+        if (e.code === 'NotFoundError') {
+            localBranchExists = false;
+        } else {
+            throw e; // 다른 종류의 에러는 다시 던집니다.
+        }
+    }
+
+    if (localBranchExists) {
+        // 최신 레포 정보를 받아옵니다
+        await git.fetch({
+            fs: currentFs,
+            http,
+            dir,
+            remote,
+            ref: branch,
+            singleBranch: true,
+            corsProxy: getGitProxy(),
+            onAuth: () => ({username: getGitId(), password: getGitPassword()}),
+        });
+        const localSha = await git.resolveRef({fs: currentFs, dir, ref: branch});
+        const remoteSha = await git.resolveRef({fs: currentFs, dir, ref: `refs/remotes/${remote}/${branch}`});
+
+        if (localSha !== remoteSha) {
+            throw new Error("서버의 커밋 상태와 현재 커밋 상태에 차이가 있습니다. 가져오기를 먼저 진행해주세요.")
+        }
+        await recursiveRmdir(currentFs, '/risudata')
+    }
+
+    await pullRepository(1)
+}
+
 /**
  * 데이터베이스를 저장하고, 새 커밋을 만듭니다
  * @param message 커밋 메시지
+ * @param progressCallback
  */
-export async function saveDatabaseAndCommit(message: string = 'Save data'): Promise<string | null> {
+export async function saveDatabaseAndCommit(message: string = 'Save data', progressCallback: (message: string) => Promise<void>): Promise<string | null> {
     try {
         let saveStart = 0;
         saveStart = (globalThis.performance ?? {now: () => Date.now()}).now();
         // 깃 저장소 활성화
         const currentFs = await getFs();
-        await ensureGitRepo(baseDir);
+        await ensureGitRepo();
 
         //암호화용 키 생성
         const encryptKey = await deriveKey(getEncryptKey());
@@ -132,7 +245,9 @@ export async function saveDatabaseAndCommit(message: string = 'Save data'): Prom
             await git.add({fs: currentFs, dir: baseDir, filepath: filepath});
         }
 
-        console.log("Start saving...")
+        if (progressCallback) {
+            await progressCallback(`백업중: 기초 데이터...`)
+        }
         // 상대적으로 작을 가능성이 높은 데이터는 그대로 저장
         await writeAndAdd(`characterOrder.json`, database.characterOrder)
         await writeAndAdd(`loreBook.json`, database.loreBook)
@@ -149,6 +264,9 @@ export async function saveDatabaseAndCommit(message: string = 'Save data'): Prom
         // 빈 폴더 생성
         await currentFs.promises.mkdir(`${baseDir}/characters`)
         for (const character of database.characters) {
+            if (progressCallback) {
+                await progressCallback(`백업중: ${character.name}`)
+            }
             // 캐릭터의 UID 로 폴더 생성
             const cid = character.chaId;
             const cidDir = `${characterDir}/${cid}`
@@ -252,42 +370,11 @@ export async function saveDatabaseAndCommit(message: string = 'Save data'): Prom
     }
 }
 
-export async function getLastCommitDate(dir: string = '/risudata'): Promise<Date | null> {
-    try {
-        const currentFs = await getFs();
-        await ensureGitRepo(dir);
-
-        const commits = await git.log({
-            fs: currentFs,
-            dir,
-            depth: 1, // 가장 최신 커밋 1개만 가져옵니다.
-        });
-
-        if (commits.length === 0) {
-            return null; // 커밋이 없는 경우
-        }
-
-        const lastCommit = commits[0];
-        const timestamp = lastCommit.commit.author.timestamp;
-        // Unix 타임스탬프(초)를 밀리초로 변환하여 Date 객체를 생성합니다.
-        return new Date(timestamp * 1000);
-
-    } catch (error: any) {
-        // 커밋이 아직 없는 경우 'NotFoundError'가 발생할 수 있습니다.
-        if (error.code === 'NotFoundError') {
-            console.log("No commits found.");
-            return null;
-        }
-        console.error('Error getting last commit date:', error);
-        throw error;
-    }
-}
-
 // 나중에 가능하면 페이징 넣기
-export async function getCommitHistory(dir: string = '/risudata'): Promise<ReadCommitResult[]> {
+export async function getCommitHistory(): Promise<ReadCommitResult[]> {
     try {
         const currentFs = await getFs();
-        await ensureGitRepo(dir);
+        await ensureGitRepo();
 
         return await git.log({
             fs: currentFs,
@@ -373,9 +460,14 @@ async function decryptCharactersChat(cid: string, chatId: string) {
     };
 }
 
-async function decryptCharacter(cid: string) {
+async function decryptCharacter(cid: string, progressCallback: (message: string) => Promise<void>) {
     const cidDir = `${dir}/characters/${cid}`
     let baseData = await readAndDecryptFromPath(`${cidDir}/data.json`);
+
+    if (progressCallback) {
+        await progressCallback(`복원중: ${baseData.name}`)
+    }
+
     const characterFilenames: string[] = await fs.promises.readdir(cidDir);
 
     // 모든 채팅을 병렬로 읽고
@@ -406,12 +498,16 @@ async function decryptCharacter(cid: string) {
 /**
  * 대상 시점의 모든 데이터를 복원합니다
  * @param sha 대상 지점
+ * @param progressCallback
  */
-export async function revertDatabaseToCommit(sha: string) {
+export async function revertDatabaseToCommit(sha: string, progressCallback: (message: string) => Promise<void>) {
     const fs = await getFs(); // fs 변수 사용
 
     try {
         console.log(`Attempting to revert to commit: ${sha}`);
+
+        // 폴더를 정리
+        await recursiveRmdir(fs, `${dir}/characters`)
 
         // 1. 작업 디렉토리를 특정 SHA의 상태로 되돌립니다.
         // force: true 는 커밋되지 않은 로컬 변경 사항을 무시하고 덮어씁니다.
@@ -424,6 +520,9 @@ export async function revertDatabaseToCommit(sha: string) {
         });
         console.log(`Checked out commit ${sha} (detached HEAD).`);
 
+        if (progressCallback) {
+            await progressCallback("복원중: 기초 데이터")
+        }
         const characterOrder = await readAndDecryptFromPath(`${dir}/characterOrder.json`)
         const loreBook = await readAndDecryptFromPath(`${dir}/loreBook.json`)
         const personas = await readAndDecryptFromPath(`${dir}/personas.json`)
@@ -435,7 +534,7 @@ export async function revertDatabaseToCommit(sha: string) {
         const characters: SlicedCharacter[] = [];
         const charactersCIDs = await fs.promises.readdir(dir + "/characters");
         for (const cid of charactersCIDs) {
-            characters.push(await decryptCharacter(cid))
+            characters.push(await decryptCharacter(cid, progressCallback))
         }
 
         const db = getDatabase();
@@ -471,7 +570,7 @@ export async function pushRepository() {
     const currentFs = await getFs();
 
     try {
-        await ensureGitRepo(dir);
+        await ensureGitRepo();
 
         console.log(`Push to: ${url}`)
 
@@ -502,42 +601,7 @@ export async function pushRepository() {
     }
 }
 
-export async function getRemoteDiff() {
-    const dir = '/risudata'
-    const remote = 'origin'
-    const branch = getBranch()
-    const url = getGitURL()
-    const currentFs = await getFs();
-
-    // push를 할 때마다 URL을 강제로 설정하여 최신 상태를 유지합니다.
-    await git.addRemote({fs: currentFs, dir, remote, url, force: true});
-
-    await git.fetch({
-        fs: currentFs,
-        http,
-        dir,
-        corsProxy: getGitProxy(),
-        remote,
-        ref: branch,
-        onAuth: () => ({username: getGitId(), password: getGitPassword()}),
-    });
-
-    const localSha = await git.resolveRef({fs: currentFs, dir, ref: branch});
-    const remoteSha = await git.resolveRef({fs: currentFs, dir, ref: `refs/remotes/${remote}/${branch}`});
-
-    console.log(`Local SHA: ${localSha}, Remote SHA: ${remoteSha}`);
-
-    // 충돌하는 'data.json' 파일의 내용 가져오기
-    const localData = await getFileContentAtCommit(localSha, 'data.json');
-    const remoteData = await getFileContentAtCommit(remoteSha, 'data.json');
-
-    return {
-        "localData": localData,
-        "remoteData": remoteData
-    }
-}
-
-export async function pullRepository() {
+export async function pullRepository(depth: number | undefined = undefined) {
     try {
         const dir = '/risudata';
         const remote = 'origin';
@@ -545,7 +609,7 @@ export async function pullRepository() {
         const url = getGitURL();
 
         const currentFs = await getFs();
-        await ensureGitRepo(dir);
+        await ensureGitRepo();
 
         console.log(`Pulling from: ${url}`);
 
@@ -591,6 +655,7 @@ export async function pullRepository() {
                 ref: branch,
                 singleBranch: true,
                 corsProxy: getGitProxy(),
+                depth,
                 onAuth: () => ({username: getGitId(), password: getGitPassword()}),
             });
             // 원격 브랜치를 추적하는 로컬 브랜치를 생성하고 checkout 합니다.
@@ -610,40 +675,80 @@ export async function pullRepository() {
     }
 }
 
-export async function saveMergeCommit(message: string = `Merge remote changes`, data: any): Promise<string | null> {
+export async function mergeCommit(
+    message: string = `Merge remote changes`,
+    useLocal: boolean // true이면 local, false이면 remote의 내용을 따름
+): Promise<string | null> {
     const dir = '/risudata';
-    const filename = 'data.json';
     const branch = getBranch();
     const remote = 'origin';
 
     try {
         const currentFs = await getFs();
-        await ensureGitRepo(dir);
+        await ensureGitRepo();
 
-        const filepath = `${dir}/${filename}`;
-        await currentFs.promises.writeFile(filepath, JSON.stringify(data, null, 1), 'utf8');
-        await git.add({fs: currentFs, dir, filepath: filename});
+        await git.fetch({
+            fs: currentFs,
+            http,
+            dir,
+            corsProxy: getGitProxy(),
+            remote,
+            ref: branch,
+            onAuth: () => ({username: getGitId(), password: getGitPassword()}),
+        });
 
-        // 병합 커밋을 위한 부모 커밋 SHA 가져오기
+        // 1. 병합할 두 부모 커밋의 SHA를 가져옵니다.
         const localSha = await git.resolveRef({fs: currentFs, dir, ref: branch});
         const remoteSha = await git.resolveRef({fs: currentFs, dir, ref: `refs/remotes/${remote}/${branch}`});
 
+        // 2. useLocal 플래그에 따라 사용할 부모 SHA를 선택합니다.
+        const chosenSha = useLocal ? localSha : remoteSha;
+        console.log(`Creating merge commit, using content from: ${useLocal ? 'local' : 'remote'} (${chosenSha})`);
+
+        // 3. 선택한 커밋의 'tree' SHA를 가져옵니다.
+        // tree는 해당 커밋 시점의 모든 파일 상태(스냅샷)를 가리킵니다.
+        const commitDetails = await git.readCommit({
+            fs: currentFs,
+            dir,
+            oid: chosenSha
+        });
+        const chosenTreeSha = commitDetails.commit.tree;
+
+        // 4. 병합 커밋을 생성합니다.
         const sha = await git.commit({
             fs: currentFs,
             dir,
             message,
-            parent: [localSha, remoteSha], // 두 개의 부모를 지정하여 병합 커밋 생성
+            parent: [localSha, remoteSha], // 부모를 2개 지정하여 '병합 커밋'으로 만듭니다.
+            tree: chosenTreeSha,           // 파일 내용은 'chosenTreeSha'의 것을 그대로 사용합니다.
             author: {
                 name: getClientName(),
                 email: 'user@risu.app'
             }
         });
 
-        console.log(`Committed merge with new changes:`, sha);
-        return sha;
+        // 5. (중요) 현재 브랜치가 이 새 병합 커밋을 가리키도록 업데이트합니다.
+        // git.commit은 커밋 객체만 생성할 뿐, 브랜치 포인터를 옮기지 않습니다.
+        await git.writeRef({
+            fs: currentFs,
+            dir,
+            ref: `refs/heads/${branch}`, // 예: 'refs/heads/main'
+            value: sha,
+            force: true // 기존 localSha에서 이 newSha로 강제 업데이트
+        });
 
+        // 6. (권장) 파일 시스템(working directory)을 새 커밋 상태와 동기화합니다.
+        await git.checkout({
+            fs: currentFs,
+            dir,
+            ref: branch,
+            force: true
+        });
+
+        console.log(`Committed merge ${sha} using ${useLocal ? 'local' : 'remote'} content.`);
+        return sha;
     } catch (error) {
-        console.error('Error saving merge commit:', error);
+        console.error('Error saving "ours" or "theirs" merge commit:', error);
         throw error;
     }
 }

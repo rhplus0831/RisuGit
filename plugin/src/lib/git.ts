@@ -1,85 +1,20 @@
 import git, {ReadCommitResult} from "isomorphic-git";
 import http from 'isomorphic-git/http/web';
-import {ensureScriptLoaded} from "./script-loader";
 import {decryptValuesRecursively, deriveKey, encryptValuesRecursively} from "./encrypt";
-import {getBranch, getClientName, getEncryptPassword, getGitId, getGitPassword, getGitProxy, getGitURL} from "./configure";
+import {
+    getBranch,
+    getClientName,
+    getEncryptPassword,
+    getGitId,
+    getGitPassword,
+    getGitProxy,
+    getGitURL
+} from "./configure";
 import {IndexedCharacter, SlicedCharacter, SlicedChat} from "./database";
-
-// LightningFS 스크립트 URL
-const LIGHTNING_FS_URL = "https://unpkg.com/@isomorphic-git/lightning-fs";
-let fs: any = null;
+import {calculateFSUsage, fileExists, getFs, recursiveRmdir, safeMkdir} from "./fs";
 
 const dir = '/risudata';
 const baseDir = dir;
-
-// fs 인스턴스를 비동기로 가져오는 함수로 변경
-async function getFs(): Promise<any> {
-    if (fs) {
-        return fs;
-    }
-
-    // LightningFS 스크립트가 로드되었는지 확인하고, 아니면 로드합니다.
-    await ensureScriptLoaded(LIGHTNING_FS_URL);
-
-    // window.LightningFS가 정의될 때까지 폴링합니다.
-    // @ts-ignore
-    if (typeof window.LightningFS === 'undefined') {
-        await new Promise<void>((resolve, reject) => {
-            const timeout = 5000; // 5초 타임아웃
-            const interval = 100; // 100ms 간격
-            let elapsed = 0;
-
-            const timer = setInterval(() => {
-                // @ts-ignore
-                if (typeof window.LightningFS !== 'undefined') {
-                    clearInterval(timer);
-                    resolve();
-                } else {
-                    elapsed += interval;
-                    if (elapsed >= timeout) {
-                        clearInterval(timer);
-                        reject(new Error("LightningFS loaded but not found on window object after timeout."));
-                    }
-                }
-            }, interval);
-        });
-    }
-
-    // 스크립트가 로드된 후에는 window.LightningFS가 확실히 존재합니다.
-    // @ts-ignore
-    const LightningFS = window.LightningFS;
-
-    if (!LightningFS) {
-        // 이 오류는 거의 발생하지 않겠지만, 만약을 위해 남겨둡니다.
-        throw new Error("LightningFS loaded but not found on window object.");
-    }
-
-    fs = new LightningFS('risuGitFS');
-    return fs;
-}
-
-async function calculateFSUsage(fs: any, dirPath = '/') {
-    let totalSize = 0;
-
-    try {
-        const entries = await fs.promises.readdir(dirPath);
-
-        for (const entry of entries) {
-            const entryPath = dirPath === '/' ? `/${entry}` : `${dirPath}/${entry}`;
-            const stats = await fs.promises.stat(entryPath);
-
-            if (stats.type === 'file') {
-                totalSize += stats.size;
-            } else if (stats.type === 'dir') {
-                totalSize += await calculateFSUsage(fs, entryPath);
-            }
-        }
-    } catch (error) {
-        console.error(`디렉토리(${dirPath}) 읽기 오류:`, error);
-    }
-
-    return totalSize;
-}
 
 export async function getDiskUsage() {
     let quota: number | undefined = undefined;
@@ -100,24 +35,12 @@ export async function getDiskUsage() {
     }
 }
 
-async function safeMkdir(fs: any, path: string) {
-    try {
-        fs.promises.mkdir(path)
-    } catch (e: any) {
-        if(e.toString().indexOf('EEXIST') !== -1) {
-            return;
-        } else {
-            throw e;
-        }
-    }
-}
-
 // Git 저장소 초기화 또는 확인 (이제 getFs가 비동기이므로 async/await 처리)
 async function ensureGitRepo() {
-    const currentFs = await getFs(); // await를 사용하여 fs 인스턴스를 가져옵니다.
+    const fs = await getFs(); // await를 사용하여 fs 인스턴스를 가져옵니다.
     try {
         console.log('Git repository already exists');
-        await currentFs.promises.stat(`${dir}/.git`);
+        await fs.promises.stat(`${dir}/.git`);
 
         // 복구중 발생했을 수 있는 DETACHED HEAD 상태 방지
         let branches = await git.listBranches({fs, dir})
@@ -138,40 +61,10 @@ async function ensureGitRepo() {
         return true;
     } catch (err) {
         console.log('Initializing new git repository');
-        await safeMkdir(currentFs, dir)
-        await git.init({fs: currentFs, dir, defaultBranch: getBranch()});
+        await safeMkdir(fs, dir)
+        await git.init({fs: fs, dir, defaultBranch: getBranch()});
         return false;
     }
-}
-
-async function recursiveRmdir(pfs: any, dir: string) {
-    let entries;
-    try {
-        // 1. Read all files and folders in the directory
-        entries = await pfs.promises.readdir(dir);
-    } catch (err: any) {
-        if (err.toString().indexOf("ENOENT") !== -1) {
-            return;
-        }
-        throw err;
-    }
-
-    // 2. Loop through all entries and delete them
-    for (const entry of entries) {
-        const entryPath = `${dir}/${entry}`;
-        const stat = await pfs.promises.stat(entryPath);
-
-        if (stat.type === 'file') {
-            // 3. If it's a file, delete it
-            await pfs.promises.unlink(entryPath);
-        } else if (stat.type === 'dir') {
-            // 4. If it's a directory, call this function recursively
-            await recursiveRmdir(pfs, entryPath);
-        }
-    }
-
-    // 5. After the directory is empty, delete it
-    await pfs.promises.rmdir(dir);
 }
 
 export async function deleteRepo() {
@@ -182,19 +75,19 @@ export async function deleteRepo() {
  * 현재 레포를 지우고 원격에서 깊이를 1로 해서 데이터를 다시 받습니다
  */
 export async function recloneRepoWithLowDepth() {
-    const currentFs = await getFs();
+    const fs = await getFs();
     await ensureGitRepo();
 
     const remote = 'origin'
     const branch = getBranch()
 
-    await git.addRemote({fs: currentFs, dir, remote, url: getGitURL(), force: true});
+    await git.addRemote({fs: fs, dir, remote, url: getGitURL(), force: true});
 
     // 로컬 브랜치가 존재하는지 확인합니다.
     let localBranchExists = true;
     try {
         // resolveRef는 ref가 없으면 에러를 던집니다.
-        await git.resolveRef({fs: currentFs, dir, ref: branch});
+        await git.resolveRef({fs: fs, dir, ref: branch});
     } catch (e: any) {
         if (e.code === 'NotFoundError') {
             localBranchExists = false;
@@ -206,7 +99,7 @@ export async function recloneRepoWithLowDepth() {
     if (localBranchExists) {
         // 최신 레포 정보를 받아옵니다
         await git.fetch({
-            fs: currentFs,
+            fs: fs,
             http,
             dir,
             remote,
@@ -215,34 +108,42 @@ export async function recloneRepoWithLowDepth() {
             corsProxy: getGitProxy(),
             onAuth: () => ({username: getGitId(), password: getGitPassword()}),
         });
-        const localSha = await git.resolveRef({fs: currentFs, dir, ref: branch});
-        const remoteSha = await git.resolveRef({fs: currentFs, dir, ref: `refs/remotes/${remote}/${branch}`});
+        const localSha = await git.resolveRef({fs: fs, dir, ref: branch});
+        const remoteSha = await git.resolveRef({fs: fs, dir, ref: `refs/remotes/${remote}/${branch}`});
 
         if (localSha !== remoteSha) {
             throw new Error("서버의 커밋 상태와 현재 커밋 상태에 차이가 있습니다. 가져오기를 먼저 진행해주세요.")
         }
-        await recursiveRmdir(currentFs, '/risudata')
+        await recursiveRmdir(fs, '/risudata')
     }
 
     await pullRepository(1)
 }
 
-async function _writeAndAdd(currentFs: any, encryptKey: CryptoKey, filepath: string, data: any) {
+async function _writeAndAdd(encryptKey: CryptoKey, filepath: string, data: any) {
     // filepath는 'dir'에 대한 상대 경로입니다 (예: 'loreBook.json')
     // ★ 수정 1: 파일 시스템에 기록할 전체 경로를 생성합니다.
+    const fs = await getFs();
     const fullFilepath = `${baseDir}/${filepath}`;
     const encrypted = JSON.stringify(await encryptValuesRecursively(data, encryptKey), null, 1);
     // console.log("writeAndAdd", filepath, encrypted)
     // ★ 수정 2: 'filepath' 대신 'fullFilepath'를 사용해 파일을 씁니다.
-    await currentFs.promises.writeFile(fullFilepath, encrypted, 'utf8')
+    await fs.promises.writeFile(fullFilepath, encrypted, 'utf8')
 
     // git.add는 'dir'와 'filepath'(상대 경로)를 받으므로 이 부분은 올바릅니다.
-    await git.add({fs: currentFs, dir: baseDir, filepath: filepath});
+    await git.add({fs: fs, dir: baseDir, filepath: filepath});
 }
 
-async function saveCharacter(currentFs: any, encryptKey: CryptoKey, character: SlicedCharacter, index: number, chatID: string | undefined = undefined) {
+async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, index: number, chatID: string | undefined = undefined) {
     async function writeAndAdd(filepath: string, data: any) {
-        await _writeAndAdd(currentFs, encryptKey, filepath, data)
+        await _writeAndAdd(encryptKey, filepath, data)
+    }
+
+    const fs = getFs();
+
+    const currentFullBackup = await fileExists('/risudata/characterOrder.json')
+    if (!currentFullBackup) {
+        throw new Error("전체 백업을 한번은 수행해야 합니다")
     }
 
     const characterDir = `characters`
@@ -266,10 +167,10 @@ async function saveCharacter(currentFs: any, encryptKey: CryptoKey, character: S
         const {message: messages, ...remainingChat} = chat;
 
         // 확실하게 비워두기
-        await recursiveRmdir(currentFs, baseChatDir)
+        await recursiveRmdir(fs, baseChatDir)
 
         // 3. 채팅 기본 디렉터리 생성. (이 작업은 선행되어야 함)
-        await safeMkdir(currentFs, baseChatDir);
+        await safeMkdir(fs, baseChatDir);
 
         // 4. 이제 병렬로 처리할 수 있는 두 가지 작업이 있습니다.
         //    A: data.json 파일 쓰기
@@ -281,7 +182,7 @@ async function saveCharacter(currentFs: any, encryptKey: CryptoKey, character: S
         // 작업 B 프로미스 (즉시 실행 함수(IIFE) 형태로 만듦)
         const messageProcessingPromise = (async () => {
             // B-1: 메시지 디렉터리 생성 (선행 작업)
-            await safeMkdir(currentFs, baseMessageDir);
+            await safeMkdir(fs, baseMessageDir);
 
             const messageWritePromises = messages.map(async (message, index) => {
                 // (중요) 원본 message 객체를 수정하는 대신,
@@ -348,21 +249,21 @@ export async function saveCharacterAndCommit(message: string = 'Save data', char
     let saveStart = 0;
     saveStart = (globalThis.performance ?? {now: () => Date.now()}).now();
     // 깃 저장소 활성화
-    const currentFs = await getFs();
+    const fs = await getFs();
     await ensureGitRepo();
     const encryptKey = await deriveKey(getEncryptPassword());
 
     const database = getDatabase()
     for (let characterIndex = 0; characterIndex < database.characters.length; characterIndex++) {
         const character = database.characters[characterIndex];
-        if(character.chaId == characterID) {
-            await saveCharacter(currentFs, encryptKey, character, characterIndex, chatID)
+        if (character.chaId == characterID) {
+            await saveCharacter(encryptKey, character, characterIndex, chatID)
         }
     }
 
     // 4. 커밋 실행
     const sha = await git.commit({
-        fs: currentFs,
+        fs: fs,
         dir: baseDir,
         message,
         author: {
@@ -386,7 +287,7 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
         let saveStart = 0;
         saveStart = (globalThis.performance ?? {now: () => Date.now()}).now();
         // 깃 저장소 활성화
-        const currentFs = await getFs();
+        const fs = await getFs();
         await ensureGitRepo();
 
         //암호화용 키 생성
@@ -394,7 +295,7 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
         const database = getDatabase();
 
         async function writeAndAdd(filepath: string, data: any) {
-            await _writeAndAdd(currentFs, encryptKey, filepath, data)
+            await _writeAndAdd(encryptKey, filepath, data)
         }
 
         if (progressCallback) {
@@ -410,21 +311,21 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
         await writeAndAdd(`botPresets.json`, database.botPresets)
 
         // 일단 폴더를 삭제
-        await recursiveRmdir(currentFs, `${baseDir}/characters`)
+        await recursiveRmdir(fs, `${baseDir}/characters`)
         // 빈 폴더 생성
-        await safeMkdir(currentFs, `${baseDir}/characters`);
+        await safeMkdir(fs, `${baseDir}/characters`);
         for (let characterIndex = 0; characterIndex < database.characters.length; characterIndex++) {
             const character = database.characters[characterIndex];
             console.log(`인덱스 ${characterIndex}: ${character}`);
             if (progressCallback) {
                 await progressCallback(`백업중: ${character.name}`)
             }
-            await saveCharacter(currentFs, encryptKey, character, characterIndex, undefined)
+            await saveCharacter(encryptKey, character, characterIndex, undefined)
         }
 
         // 4. 커밋 실행
         const sha = await git.commit({
-            fs: currentFs,
+            fs: fs,
             dir: baseDir,
             message,
             author: {
@@ -445,11 +346,11 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
 // 나중에 가능하면 페이징 넣기
 export async function getCommitHistory(): Promise<ReadCommitResult[]> {
     try {
-        const currentFs = await getFs();
+        const fs = await getFs();
         await ensureGitRepo();
 
         return await git.log({
-            fs: currentFs,
+            fs: fs,
             dir,
         });
     } catch (error: any) {
@@ -463,10 +364,10 @@ export async function getCommitHistory(): Promise<ReadCommitResult[]> {
 }
 
 export async function getFileContentAtCommit(sha: string, filename: string): Promise<any | null> {
-    const currentFs = await getFs();
+    const fs = await getFs();
     try {
         const {blob} = await git.readBlob({
-            fs: currentFs,
+            fs: fs,
             dir,
             oid: sha,
             filepath: filename
@@ -484,6 +385,7 @@ export async function getFileContentAtCommit(sha: string, filename: string): Pro
 }
 
 async function readAndDecryptFromPath(path: string) {
+    const fs = await getFs();
     const text = await fs.promises.readFile(path, 'utf8')
     const key = await deriveKey(getEncryptPassword())
     return decryptValuesRecursively(JSON.parse(text), key);
@@ -494,6 +396,8 @@ async function decryptCharactersChat(cid: string, chatId: string) {
     const baseChatData = await readAndDecryptFromPath(`${chatDir}/data.json`)
 
     const messageDir = `${chatDir}/messages`
+
+    const fs = await getFs();
 
     let messageFilenames: string[] = []
     try {
@@ -539,6 +443,8 @@ async function decryptCharacter(cid: string, progressCallback: (message: string)
     if (progressCallback) {
         await progressCallback(`복원중: ${baseData.name}`)
     }
+
+    const fs = await getFs();
 
     const characterFilenames: string[] = await fs.promises.readdir(cidDir);
 
@@ -694,7 +600,7 @@ export async function pushRepository() {
     const remote = 'origin'
     const branch = getBranch()
     const url = getGitURL()
-    const currentFs = await getFs();
+    const fs = await getFs();
 
     try {
         await ensureGitRepo();
@@ -702,10 +608,10 @@ export async function pushRepository() {
         console.log(`Push to: ${url}`)
 
         // push를 할 때마다 URL을 강제로 설정하여 최신 상태를 유지합니다.
-        await git.addRemote({fs: currentFs, dir, remote, url, force: true});
+        await git.addRemote({fs: fs, dir, remote, url, force: true});
 
         const result = await git.push({
-            fs: currentFs,
+            fs: fs,
             http,
             dir,
             corsProxy: getGitProxy(),
@@ -735,18 +641,18 @@ export async function pullRepository(depth: number | undefined = undefined) {
         const branch = getBranch();
         const url = getGitURL();
 
-        const currentFs = await getFs();
+        const fs = await getFs();
         await ensureGitRepo();
 
         console.log(`Pulling from: ${url}`);
 
-        await git.addRemote({fs: currentFs, dir, remote, url, force: true});
+        await git.addRemote({fs: fs, dir, remote, url, force: true});
 
         // 로컬 브랜치가 존재하는지 확인합니다.
         let localBranchExists = true;
         try {
             // resolveRef는 ref가 없으면 에러를 던집니다.
-            await git.resolveRef({fs: currentFs, dir, ref: branch});
+            await git.resolveRef({fs: fs, dir, ref: branch});
         } catch (e: any) {
             if (e.code === 'NotFoundError') {
                 localBranchExists = false;
@@ -759,7 +665,7 @@ export async function pullRepository(depth: number | undefined = undefined) {
             // 브랜치가 존재하면, 변경사항을 pull 합니다.
             console.log(`Local branch '${branch}' exists. Pulling changes.`);
             await git.pull({
-                fs: currentFs,
+                fs: fs,
                 http,
                 dir,
                 ref: branch,
@@ -775,7 +681,7 @@ export async function pullRepository(depth: number | undefined = undefined) {
             // 브랜치가 없으면, 원격 저장소에서 fetch 하고 checkout 합니다 (클론과 유사).
             console.log(`Local branch '${branch}' not found. Fetching and checking out.`);
             await git.fetch({
-                fs: currentFs,
+                fs: fs,
                 http,
                 dir,
                 remote,
@@ -787,7 +693,7 @@ export async function pullRepository(depth: number | undefined = undefined) {
             });
             // 원격 브랜치를 추적하는 로컬 브랜치를 생성하고 checkout 합니다.
             await git.checkout({
-                fs: currentFs,
+                fs: fs,
                 dir,
                 ref: branch,
                 remote
@@ -811,11 +717,11 @@ export async function mergeCommit(
     const remote = 'origin';
 
     try {
-        const currentFs = await getFs();
+        const fs = await getFs();
         await ensureGitRepo();
 
         await git.fetch({
-            fs: currentFs,
+            fs: fs,
             http,
             dir,
             corsProxy: getGitProxy(),
@@ -825,8 +731,8 @@ export async function mergeCommit(
         });
 
         // 1. 병합할 두 부모 커밋의 SHA를 가져옵니다.
-        const localSha = await git.resolveRef({fs: currentFs, dir, ref: branch});
-        const remoteSha = await git.resolveRef({fs: currentFs, dir, ref: `refs/remotes/${remote}/${branch}`});
+        const localSha = await git.resolveRef({fs: fs, dir, ref: branch});
+        const remoteSha = await git.resolveRef({fs: fs, dir, ref: `refs/remotes/${remote}/${branch}`});
 
         // 2. useLocal 플래그에 따라 사용할 부모 SHA를 선택합니다.
         const chosenSha = useLocal ? localSha : remoteSha;
@@ -835,7 +741,7 @@ export async function mergeCommit(
         // 3. 선택한 커밋의 'tree' SHA를 가져옵니다.
         // tree는 해당 커밋 시점의 모든 파일 상태(스냅샷)를 가리킵니다.
         const commitDetails = await git.readCommit({
-            fs: currentFs,
+            fs: fs,
             dir,
             oid: chosenSha
         });
@@ -843,7 +749,7 @@ export async function mergeCommit(
 
         // 4. 병합 커밋을 생성합니다.
         const sha = await git.commit({
-            fs: currentFs,
+            fs: fs,
             dir,
             message,
             parent: [localSha, remoteSha], // 부모를 2개 지정하여 '병합 커밋'으로 만듭니다.
@@ -857,7 +763,7 @@ export async function mergeCommit(
         // 5. (중요) 현재 브랜치가 이 새 병합 커밋을 가리키도록 업데이트합니다.
         // git.commit은 커밋 객체만 생성할 뿐, 브랜치 포인터를 옮기지 않습니다.
         await git.writeRef({
-            fs: currentFs,
+            fs: fs,
             dir,
             ref: `refs/heads/${branch}`, // 예: 'refs/heads/main'
             value: sha,
@@ -866,7 +772,7 @@ export async function mergeCommit(
 
         // 6. (권장) 파일 시스템(working directory)을 새 커밋 상태와 동기화합니다.
         await git.checkout({
-            fs: currentFs,
+            fs: fs,
             dir,
             ref: branch,
             force: true

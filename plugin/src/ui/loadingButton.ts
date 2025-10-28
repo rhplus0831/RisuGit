@@ -1,3 +1,5 @@
+import {remoteIsValid} from "../lib/configure";
+
 /**
  * 긴 작업을 하고 있음을 표시하고, 관련된 버튼을 비활성화 했다가 되돌림
  * @param loadingButton 로딩이 되고있는 변수
@@ -46,4 +48,12 @@ d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 
     }
 
     loadingButton.onclick = wrapped;
+}
+
+export function disableButtonIfRemoteIsInvalid(button: HTMLButtonElement) {
+    if (!remoteIsValid()) {
+        button.classList.add('rg-opacity-50', 'rg-cursor-not-allowed', 'flag-disabled')
+        button.disabled = true;
+        button.innerHTML += ' (원격 설정 필요)'
+    }
 }

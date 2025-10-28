@@ -52,6 +52,10 @@ export function getGitPassword() {
     return "";
 }
 
+export function remoteIsValid() {
+    return getGitURL() && getGitId() && getGitPassword();
+}
+
 export function getGitProxy() {
     const value = getMyArgument("git_proxy");
     if (value) return value;

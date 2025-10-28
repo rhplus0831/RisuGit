@@ -1,5 +1,5 @@
 import {BaseOverlay} from "./baseOverlay";
-import {applyClickHandlerWithSpinner} from "./loadingButton";
+import {applyClickHandlerWithSpinner, disableButtonIfRemoteIsInvalid} from "./loadingButton";
 import {pushRepository, saveCharacterAndCommit, saveDatabaseAndCommit} from "../lib/git";
 import overlayTemplate from '../ui/settings.html';
 
@@ -27,6 +27,8 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
     closeButton.addEventListener('click', () => {
         overlay.close()
     })
+
+    disableButtonIfRemoteIsInvalid(pushButton)
 
     const char = getChar()
     characterNameSpan.innerText = char.name

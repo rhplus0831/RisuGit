@@ -1,11 +1,16 @@
 import {BaseOverlay} from "./baseOverlay";
 import {
     deleteRepo,
-    getCommitHistory, getDiskUsage, getFileContentAtCommit, pullRepository, pushRepository, recloneRepoWithLowDepth,
-    revertDatabaseToCommit, saveDatabaseAndCommit
+    getCommitHistory,
+    getDiskUsage,
+    pullRepository,
+    pushRepository,
+    recloneRepoWithLowDepth,
+    revertDatabaseToCommit,
+    saveDatabaseAndCommit
 } from "../lib/git";
 import mergeTemplate from './merge.html';
-import {applyClickHandlerWithSpinner} from "./loadingButton";
+import {applyClickHandlerWithSpinner, disableButtonIfRemoteIsInvalid} from "./loadingButton";
 
 export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivElement) {
     const closeButton = container.querySelector<HTMLButtonElement>('#rg-close-button');
@@ -38,6 +43,10 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
     closeButton.addEventListener('click', () => {
         overlay.close()
     })
+
+    disableButtonIfRemoteIsInvalid(pushButton);
+    disableButtonIfRemoteIsInvalid(pullButton);
+    disableButtonIfRemoteIsInvalid(trimButton);
 
     async function checkPersist() {
         if (persistButton) {
@@ -145,7 +154,7 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
     applyClickHandlerWithSpinner(commitButton, buttons, async (setMessage) => {
         try {
             const message = prompt('커밋 메시지를 정하세요', '세이브 데이터');
-            if(!message) return;
+            if (!message) return;
             const isChanged = await saveDatabaseAndCommit(message, setMessage);
             if (!isChanged) {
                 alert('변경 사항이 없습니다!')
@@ -193,7 +202,7 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
         try {
             if (confirm('특정 커밋을 로컬에서, 없는경우 서버에서 받아와 복원을 시도합니다, 계속할까요?')) {
                 const sha = prompt("커밋 ID(sha)를 입력해주세요")
-                if(!sha) {
+                if (!sha) {
                     return;
                 }
                 await revertDatabaseToCommit(sha, setMessage)

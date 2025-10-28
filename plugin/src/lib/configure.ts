@@ -58,7 +58,7 @@ export function getGitProxy() {
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_PROXY;
     }
-    return "";
+    return "https://cors.isomorphic-git.org";
 }
 
 export function getBranch() {

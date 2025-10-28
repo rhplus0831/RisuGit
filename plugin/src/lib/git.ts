@@ -264,7 +264,7 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
         // 빈 폴더 생성
         await currentFs.promises.mkdir(`${baseDir}/characters`)
         for (let characterIndex = 0; characterIndex < database.characters.length; characterIndex++) {
-            const character = database[characterIndex];
+            const character = database.characters[characterIndex];
             if (progressCallback) {
                 await progressCallback(`백업중: ${character.name}`)
             }

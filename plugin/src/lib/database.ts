@@ -5,12 +5,15 @@ export interface SlicedMessage {
 
 export interface SlicedChat {
     id: string
+    name: string
     message: SlicedMessage[]
 }
 
 export interface SlicedCharacter {
     chaId: string
-    chats: SlicedChat[]
+    chats: SlicedChat[],
+    name: string,
+    chatPage: number
 }
 
 export interface IndexedCharacter extends SlicedCharacter {

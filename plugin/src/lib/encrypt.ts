@@ -1,5 +1,5 @@
 // 인코더 캐싱
-import {getEncryptKey} from "./configure";
+import {getEncryptPassword} from "./configure";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();

@@ -2,7 +2,7 @@
 <div class="rg-flex rg-flex-col rg-gap-2 rg-w-[100vw] rg-h-[100vh]">
     <div style="display: none">
         <!--        구성 요소 -->
-        <div id="rg-history" class="rg-flex rg-flex-row rg-border-b-2 rg-border-black">
+        <div id="rg-history" class="rg-flex rg-flex-col rg-lg:rg-flex-row rg-border-b-2 rg-border-black">
             <div class="rg-flex-1 rg-flex rg-flex-col">
                 <span id="rg-history-message">메시지 <span id="rg-history-commit-id" class="rg-ml-2">커밋 아이디</span></span>
                 <span id="rg-history-date">날자</span>
@@ -49,6 +49,10 @@
         <button id="rg-trim-button"
                 class="rg-bg-yellow-500 hover:rg-bg-yellow-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded rg-flex rg-flex-row rg-gap-2 rg-justify-center rg-align-middle">
             최근 커밋만 받기
+        </button>
+        <button id="rg-revert-button"
+                class="rg-bg-yellow-500 hover:rg-bg-yellow-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded rg-flex rg-flex-row rg-gap-2 rg-justify-center rg-align-middle">
+            특정 커밋으로 돌아가기
         </button>
         <button id="rg-delete-button"
                 class="rg-bg-red-300 hover:rg-bg-red-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded rg-flex rg-flex-row rg-gap-2 rg-justify-center rg-align-middle">

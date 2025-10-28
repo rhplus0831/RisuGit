@@ -16,7 +16,7 @@ function getMyArgument(name: string) {
     return globalThis.__pluginApis__.getArg(`RisuGit::${name}`)
 }
 
-export function getEncryptKey() {
+export function getEncryptPassword() {
     const value = getMyArgument("encrypt_key");
     if (value) return value;
     if (process.env.NODE_ENV === 'development') {

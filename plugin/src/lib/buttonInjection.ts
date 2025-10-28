@@ -1,5 +1,6 @@
 import {BaseOverlay} from "../ui/baseOverlay";
-import overlayTemplate from '../ui/overlay.html';
+import overlayTemplate from '../ui/settings.html';
+import chatTemplate from '../ui/quick.html';
 // @ts-ignore
 import tailwindStyles from '../../dist/main.css';
 // @ts-ignore
@@ -8,7 +9,7 @@ import diffStyles from '../../node_modules/jsondiffpatch/lib/formatters/styles/h
 // 주입된 스타일이 중복되지 않도록 한 번만 실행
 (function () {
     let style: HTMLStyleElement | null = document.getElementById('risu-git-styles') as HTMLStyleElement;
-    if(!style) {
+    if (!style) {
         style = document.createElement('style');
         style.id = 'risu-git-styles';
         document.head.appendChild(style);
@@ -16,7 +17,7 @@ import diffStyles from '../../node_modules/jsondiffpatch/lib/formatters/styles/h
     style.innerHTML = tailwindStyles;
 
     let diffStyle: HTMLStyleElement | null = document.getElementById('risu-git-diff-styles') as HTMLStyleElement;
-    if(!diffStyle) {
+    if (!diffStyle) {
         diffStyle = document.createElement('style');
         diffStyle.id = 'risu-git-diff-styles';
         document.head.appendChild(diffStyle);
@@ -24,7 +25,7 @@ import diffStyles from '../../node_modules/jsondiffpatch/lib/formatters/styles/h
     diffStyle.innerHTML = diffStyles;
 })();
 
-function makeMutationObserver(callback: () => void, targetNode: HTMLElement | undefined = undefined, config: MutationObserverInit | undefined = undefined) {
+function makeMutationObserver(callbacks: (() => void)[], targetNode: HTMLElement | undefined = undefined, config: MutationObserverInit | undefined = undefined) {
     if (!targetNode) {
         targetNode = document.body
     }
@@ -33,7 +34,9 @@ function makeMutationObserver(callback: () => void, targetNode: HTMLElement | un
     }
     const innerCallback = (_: any, observer: MutationObserver) => {
         observer.disconnect()
-        callback()
+        for (const callback of callbacks) {
+            callback()
+        }
         observer.observe(targetNode, config);
     };
     const observer = new MutationObserver(innerCallback);
@@ -41,14 +44,50 @@ function makeMutationObserver(callback: () => void, targetNode: HTMLElement | un
     return observer;
 }
 
-let injectedButton: HTMLButtonElement | null = null;
-const overlay = new BaseOverlay();
+let injectedChatButton: HTMLButtonElement | null = null;
+const chatOverlay = new BaseOverlay();
+
+let injectedSettingButton: HTMLButtonElement | null = null;
+const settingOverlay = new BaseOverlay();
+
+async function getSetting() {
+    if (injectedSettingButton) {
+        if (injectedSettingButton.isConnected) return;
+        injectedSettingButton.remove();
+        injectedSettingButton = null;
+    }
+
+    // closest returns Element | null; narrow or handle null:
+    const settingButtons = document.body.querySelector('.rs-setting-cont-3') as HTMLDivElement | null;
+    if (!settingButtons) {
+        //TODO: Notify this?
+        return
+    }
+    let button = settingButtons.querySelector<HTMLButtonElement>('#rg-setting-button') as HTMLButtonElement;
+    if (!button) {
+        button = document.createElement('button')
+        button.id = "rg-setting-button"
+        button.className = "flex gap-2 items-center hover:text-textcolor text-textcolor2"
+        button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-git-commit-horizontal-icon lucide-git-commit-horizontal"><circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/></svg>리스깃 패널`
+
+        const lastChild = settingButtons.lastChild;
+        if (lastChild) {
+            settingButtons.insertBefore(button, lastChild);
+        } else {
+            // 자식이 없으면 그냥 추가
+            settingButtons.appendChild(button);
+        }
+    }
+    button.onclick = () => {
+        settingOverlay.show(overlayTemplate, 'settings');
+    }
+}
 
 async function getToolbar() {
-    if (injectedButton) {
-        if (injectedButton.isConnected) return;
-        injectedButton.remove();
-        injectedButton = null;
+    if (injectedChatButton) {
+        if (injectedChatButton.isConnected) return;
+        injectedChatButton.remove();
+        injectedChatButton = null;
     }
 
     const svg = document.body.querySelector('.setting-area svg.lucide-folder-plus') as SVGElement | null;
@@ -68,7 +107,7 @@ async function getToolbar() {
         button = document.createElement('button')
         button.id = "rg-open-button"
         button.className = "text-textcolor2 hover:text-green-500 ml-2 cursor-pointer"
-        button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-ccw-icon lucide-refresh-ccw"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>`
+        button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-git2-icon lucide-folder-git-2"><path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"/><circle cx="13" cy="12" r="2"/><path d="M18 19c-2.8 0-5-2.2-5-5v8"/><circle cx="20" cy="19" r="2"/></svg>`
 
         const lastChild = toolbar.lastChild;
         if (lastChild) {
@@ -79,10 +118,10 @@ async function getToolbar() {
         }
     }
     button.onclick = () => {
-        overlay.show(overlayTemplate, 'overlay');
+        chatOverlay.show(chatTemplate, 'quick');
     }
 }
 
-makeMutationObserver(getToolbar);
+makeMutationObserver([getToolbar, getSetting]);
 
 export {};

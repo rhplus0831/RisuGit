@@ -6,7 +6,7 @@ export class BaseOverlay {
     private cleanup: (() => void) | null | undefined = null;
     public extraCleanup: (() => void) | null = null;
 
-    async show(html: string, logic: "overlay" | "merge") {
+    async show(html: string, logic: "settings" | "merge" | "quick") {
         if (this.element) return; // 이미 열려있으면 무시
 
         const content = html
@@ -22,11 +22,14 @@ export class BaseOverlay {
         document.body.appendChild(this.element);
 
         // TypeScript 로직 초기화
-        if (logic == "overlay") {
-            const {initializeOverlayLogic} = await import('./overlay-logic');
+        if (logic == "settings") {
+            const {initializeOverlayLogic} = await import('./settings-logic');
             this.cleanup = initializeOverlayLogic(this, this.element);
         } else if (logic == "merge") {
             const {initializeOverlayLogic} = await import('./merge-logic');
+            this.cleanup = initializeOverlayLogic(this, this.element);
+        } else if (logic == "quick") {
+            const {initializeOverlayLogic} = await import('./quick-logic');
             this.cleanup = initializeOverlayLogic(this, this.element);
         }
     }
@@ -40,7 +43,7 @@ export class BaseOverlay {
             this.cleanup = null;
         }
 
-        if(this.extraCleanup) {
+        if (this.extraCleanup) {
             this.extraCleanup();
             this.extraCleanup = null;
         }

@@ -2,7 +2,7 @@ import git, {ReadCommitResult} from "isomorphic-git";
 import http from 'isomorphic-git/http/web';
 import {ensureScriptLoaded} from "./script-loader";
 import {decryptValuesRecursively, deriveKey, encryptValuesRecursively} from "./encrypt";
-import {getBranch, getClientName, getEncryptKey, getGitId, getGitPassword, getGitProxy, getGitURL} from "./configure";
+import {getBranch, getClientName, getEncryptPassword, getGitId, getGitPassword, getGitProxy, getGitURL} from "./configure";
 import {IndexedCharacter, SlicedCharacter, SlicedChat} from "./database";
 
 // LightningFS 스크립트 URL
@@ -100,6 +100,18 @@ export async function getDiskUsage() {
     }
 }
 
+async function safeMkdir(fs: any, path: string) {
+    try {
+        fs.promises.mkdir(path)
+    } catch (e: any) {
+        if(e.toString().indexOf('EEXIST') !== -1) {
+            return;
+        } else {
+            throw e;
+        }
+    }
+}
+
 // Git 저장소 초기화 또는 확인 (이제 getFs가 비동기이므로 async/await 처리)
 async function ensureGitRepo() {
     const currentFs = await getFs(); // await를 사용하여 fs 인스턴스를 가져옵니다.
@@ -126,7 +138,7 @@ async function ensureGitRepo() {
         return true;
     } catch (err) {
         console.log('Initializing new git repository');
-        await currentFs.promises.mkdir(dir, {recursive: true});
+        await safeMkdir(currentFs, dir)
         await git.init({fs: currentFs, dir, defaultBranch: getBranch()});
         return false;
     }
@@ -215,6 +227,155 @@ export async function recloneRepoWithLowDepth() {
     await pullRepository(1)
 }
 
+async function _writeAndAdd(currentFs: any, encryptKey: CryptoKey, filepath: string, data: any) {
+    // filepath는 'dir'에 대한 상대 경로입니다 (예: 'loreBook.json')
+    // ★ 수정 1: 파일 시스템에 기록할 전체 경로를 생성합니다.
+    const fullFilepath = `${baseDir}/${filepath}`;
+    const encrypted = JSON.stringify(await encryptValuesRecursively(data, encryptKey), null, 1);
+    // console.log("writeAndAdd", filepath, encrypted)
+    // ★ 수정 2: 'filepath' 대신 'fullFilepath'를 사용해 파일을 씁니다.
+    await currentFs.promises.writeFile(fullFilepath, encrypted, 'utf8')
+
+    // git.add는 'dir'와 'filepath'(상대 경로)를 받으므로 이 부분은 올바릅니다.
+    await git.add({fs: currentFs, dir: baseDir, filepath: filepath});
+}
+
+async function saveCharacter(currentFs: any, encryptKey: CryptoKey, character: SlicedCharacter, index: number, chatID: string | undefined = undefined) {
+    async function writeAndAdd(filepath: string, data: any) {
+        await _writeAndAdd(currentFs, encryptKey, filepath, data)
+    }
+
+    const characterDir = `characters`
+    const cid = character.chaId;
+    const cidDir = `${characterDir}/${cid}`
+    await safeMkdir(fs, `${baseDir}/${cidDir}`)
+
+    const {chats, ...remainingCharacter} = character;
+    await writeAndAdd(`${cidDir}/data.json`, {...remainingCharacter, index: index})
+
+    const encoder = new TextEncoder();
+
+    async function saveChat(chat: SlicedChat, chatIndex: number) {
+        // 경로 정의
+        const chatDir = `${cidDir}/${chat.id}`;
+        const baseChatDir = `${baseDir}/${chatDir}`;
+        const messageDir = `${chatDir}/messages`; // writeAndAdd용 상대 경로
+        const baseMessageDir = `${baseDir}/${messageDir}`; // mkdir용 전체 경로
+
+        // 2. 가독성을 위해 chat.message를 messages로 이름을 변경합니다.
+        const {message: messages, ...remainingChat} = chat;
+
+        // 확실하게 비워두기
+        await recursiveRmdir(currentFs, baseChatDir)
+
+        // 3. 채팅 기본 디렉터리 생성. (이 작업은 선행되어야 함)
+        await safeMkdir(currentFs, baseChatDir);
+
+        // 4. 이제 병렬로 처리할 수 있는 두 가지 작업이 있습니다.
+        //    A: data.json 파일 쓰기
+        //    B: message 디렉터리 생성 후 모든 메시지 파일 병렬로 쓰기
+
+        // 작업 A 프로미스
+        const dataWritePromise = writeAndAdd(`${chatDir}/data.json`, {...remainingChat, index: chatIndex});
+
+        // 작업 B 프로미스 (즉시 실행 함수(IIFE) 형태로 만듦)
+        const messageProcessingPromise = (async () => {
+            // B-1: 메시지 디렉터리 생성 (선행 작업)
+            await safeMkdir(currentFs, baseMessageDir);
+
+            const messageWritePromises = messages.map(async (message, index) => {
+                // (중요) 원본 message 객체를 수정하는 대신,
+                // index가 포함된 '새로운' 객체를 만듭니다. (권장되는 방식)
+                const messageWithIndex = {
+                    ...message,   // 기존 message 객체의 모든 속성을 복사
+                    index: index  // 'index'라는 키로 순서 추가 (원하는 키 이름 사용 가능)
+                };
+                let uid = message.chatId;
+                // send, sendas 등으로 보내진 메시지
+                if (uid === undefined) {
+                    // 고유 UID 임시 생성, 그리 안전해보이지는 않는데, 애초에 send, sendas 를 쓰는 상황이 거의 없어서...
+                    const data = encoder.encode(`${character.chaId}-${chat.id}-${index}`);
+                    const hash = await crypto.subtle.digest('SHA-256', data);
+                    // 1. ArrayBuffer를 바이트 배열(Uint8Array)로 변환합니다.
+                    const hashArray = Array.from(new Uint8Array(hash));
+
+                    // 2. 각 바이트(숫자)를 16진수 문자열로 변환하고,
+                    //    '0'으로 패딩하여 항상 2자리를 만들고 (예: 5 -> "05"),
+                    //    모두 합쳐서 최종 문자열을 만듭니다.
+                    uid = hashArray
+                        .map((b) => b.toString(16).padStart(2, '0'))
+                        .join('');
+                }
+                return writeAndAdd(`${messageDir}/${uid}.json`, messageWithIndex);
+            });
+
+            // B-3: 이 채팅의 모든 메시지 쓰기 작업을 병렬로 실행하고 기다립니다.
+            await Promise.all(messageWritePromises);
+        })(); // <-- ()를 붙여 즉시 실행
+
+        // 5. 작업 A와 작업 B를 병렬로 실행하고 둘 다 완료될 때까지 기다립니다.
+        await Promise.all([
+            dataWritePromise,
+            messageProcessingPromise
+        ]);
+    }
+
+    let chatPromises: Promise<void>[] = []
+    if (chatID === undefined) {
+        chatPromises = character.chats.map(async (chat: SlicedChat, index: number) => {
+            return saveChat(chat, index)
+        });
+    } else {
+        for (let i = 0; i < character.chats.length; i++) {
+            const chat = character.chats[i];
+            if (chat.id === chatID) {
+                chatPromises = [saveChat(chat, i)]
+                break
+            }
+        }
+    }
+    await Promise.all(chatPromises);
+}
+
+/**
+ * 특정 캐릭터의 데이터를 저장합니다
+ * @param message
+ * @param characterID
+ * @param chatID 채팅 아이디, 지정되지 않으면 모든 채팅을 저장합니다
+ * @param progressCallback
+ */
+export async function saveCharacterAndCommit(message: string = 'Save data', characterID: string, chatID: string | undefined, progressCallback: (message: string) => Promise<void>) {
+    let saveStart = 0;
+    saveStart = (globalThis.performance ?? {now: () => Date.now()}).now();
+    // 깃 저장소 활성화
+    const currentFs = await getFs();
+    await ensureGitRepo();
+    const encryptKey = await deriveKey(getEncryptPassword());
+
+    const database = getDatabase()
+    for (let characterIndex = 0; characterIndex < database.characters.length; characterIndex++) {
+        const character = database.characters[characterIndex];
+        if(character.chaId == characterID) {
+            await saveCharacter(currentFs, encryptKey, character, characterIndex, chatID)
+        }
+    }
+
+    // 4. 커밋 실행
+    const sha = await git.commit({
+        fs: currentFs,
+        dir: baseDir,
+        message,
+        author: {
+            name: getClientName(),
+            email: 'user@risu.app'
+        }
+    });
+
+    const saveEnd = (globalThis.performance ?? {now: () => Date.now()}).now();
+    console.log(`커밋 저장 시간: ${(saveEnd - saveStart).toFixed(2)} ms`);
+    return sha;
+}
+
 /**
  * 데이터베이스를 저장하고, 새 커밋을 만듭니다
  * @param message 커밋 메시지
@@ -229,20 +390,11 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
         await ensureGitRepo();
 
         //암호화용 키 생성
-        const encryptKey = await deriveKey(getEncryptKey());
+        const encryptKey = await deriveKey(getEncryptPassword());
         const database = getDatabase();
 
         async function writeAndAdd(filepath: string, data: any) {
-            // filepath는 'dir'에 대한 상대 경로입니다 (예: 'loreBook.json')
-            // ★ 수정 1: 파일 시스템에 기록할 전체 경로를 생성합니다.
-            const fullFilepath = `${baseDir}/${filepath}`;
-            const encrypted = JSON.stringify(await encryptValuesRecursively(data, encryptKey), null, 1);
-            // console.log("writeAndAdd", filepath, encrypted)
-            // ★ 수정 2: 'filepath' 대신 'fullFilepath'를 사용해 파일을 씁니다.
-            await currentFs.promises.writeFile(fullFilepath, encrypted, 'utf8')
-
-            // git.add는 'dir'와 'filepath'(상대 경로)를 받으므로 이 부분은 올바릅니다.
-            await git.add({fs: currentFs, dir: baseDir, filepath: filepath});
+            await _writeAndAdd(currentFs, encryptKey, filepath, data)
         }
 
         if (progressCallback) {
@@ -257,98 +409,17 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
         await writeAndAdd(`statistics.json`, database.statistics)
         await writeAndAdd(`botPresets.json`, database.botPresets)
 
-        // 캐릭터 및 채팅 반복 시작
-        const characterDir = `characters`
         // 일단 폴더를 삭제
         await recursiveRmdir(currentFs, `${baseDir}/characters`)
         // 빈 폴더 생성
-        await currentFs.promises.mkdir(`${baseDir}/characters`)
+        await safeMkdir(currentFs, `${baseDir}/characters`);
         for (let characterIndex = 0; characterIndex < database.characters.length; characterIndex++) {
             const character = database.characters[characterIndex];
+            console.log(`인덱스 ${characterIndex}: ${character}`);
             if (progressCallback) {
                 await progressCallback(`백업중: ${character.name}`)
             }
-            // 캐릭터의 UID 로 폴더 생성
-            const cid = character.chaId;
-            const cidDir = `${characterDir}/${cid}`
-            await currentFs.promises.mkdir(`${baseDir}/${cidDir}`)
-
-            const {chats, ...remainingCharacter} = character;
-
-            //채팅 데이터를 제외한 나머지 데이터를 저장
-            await writeAndAdd(`${cidDir}/data.json`, {...remainingCharacter, index: characterIndex})
-
-            const allChatPromises = character.chats.map(async (chat: SlicedChat, index: number) => {
-                // 경로 정의
-                const chatDir = `${cidDir}/${chat.id}`;
-                const baseChatDir = `${baseDir}/${chatDir}`;
-                const messageDir = `${chatDir}/messages`; // writeAndAdd용 상대 경로
-                const baseMessageDir = `${baseDir}/${messageDir}`; // mkdir용 전체 경로
-
-                // 2. 가독성을 위해 chat.message를 messages로 이름을 변경합니다.
-                const {message: messages, ...remainingChat} = chat;
-
-                // 3. 채팅 기본 디렉터리 생성. (이 작업은 선행되어야 함)
-                await currentFs.promises.mkdir(baseChatDir);
-
-                // 4. 이제 병렬로 처리할 수 있는 두 가지 작업이 있습니다.
-                //    A: data.json 파일 쓰기
-                //    B: message 디렉터리 생성 후 모든 메시지 파일 병렬로 쓰기
-
-                // 작업 A 프로미스
-                const dataWritePromise = writeAndAdd(`${chatDir}/data.json`, {...remainingChat, index: index});
-
-                const encoder = new TextEncoder();
-
-                // 작업 B 프로미스 (즉시 실행 함수(IIFE) 형태로 만듦)
-                const messageProcessingPromise = (async () => {
-                    // B-1: 메시지 디렉터리 생성 (선행 작업)
-                    await currentFs.promises.mkdir(baseMessageDir);
-
-                    const messageWritePromises = messages.map(async (message, index) => {
-                        // (중요) 원본 message 객체를 수정하는 대신,
-                        // index가 포함된 '새로운' 객체를 만듭니다. (권장되는 방식)
-                        const messageWithIndex = {
-                            ...message,   // 기존 message 객체의 모든 속성을 복사
-                            index: index  // 'index'라는 키로 순서 추가 (원하는 키 이름 사용 가능)
-                        };
-                        let uid = message.chatId;
-                        // send, sendas 등으로 보내진 메시지
-                        if (uid === undefined) {
-                            // 고유 UID 임시 생성, 안전할지 잘 몰?루 겠음
-                            const data = encoder.encode(JSON.stringify(messageWithIndex));
-                            const hash = await crypto.subtle.digest('SHA-256', data);
-                            // 1. ArrayBuffer를 바이트 배열(Uint8Array)로 변환합니다.
-                            const hashArray = Array.from(new Uint8Array(hash));
-
-                            // 2. 각 바이트(숫자)를 16진수 문자열로 변환하고,
-                            //    '0'으로 패딩하여 항상 2자리를 만들고 (예: 5 -> "05"),
-                            //    모두 합쳐서 최종 문자열을 만듭니다.
-                            uid = hashArray
-                                .map((b) => b.toString(16).padStart(2, '0'))
-                                .join('');
-                        }
-                        return writeAndAdd(`${messageDir}/${uid}.json`, messageWithIndex);
-                    });
-
-                    // B-3: 이 채팅의 모든 메시지 쓰기 작업을 병렬로 실행하고 기다립니다.
-                    await Promise.all(messageWritePromises);
-                })(); // <-- ()를 붙여 즉시 실행
-
-                // 5. 작업 A와 작업 B를 병렬로 실행하고 둘 다 완료될 때까지 기다립니다.
-                await Promise.all([
-                    dataWritePromise,
-                    messageProcessingPromise
-                ]);
-            });
-
-            // 6. 모든 채팅의 처리가 병렬로 완료될 때까지 기다립니다.
-            try {
-                await Promise.all(allChatPromises);
-                console.log(`${character.chaId}: 모든 채팅 데이터 저장이 완료되었습니다.`);
-            } catch (error) {
-                console.error('채팅 데이터 저장 중 오류 발생:', error);
-            }
+            await saveCharacter(currentFs, encryptKey, character, characterIndex, undefined)
         }
 
         // 4. 커밋 실행
@@ -414,7 +485,7 @@ export async function getFileContentAtCommit(sha: string, filename: string): Pro
 
 async function readAndDecryptFromPath(path: string) {
     const text = await fs.promises.readFile(path, 'utf8')
-    const key = await deriveKey(getEncryptKey())
+    const key = await deriveKey(getEncryptPassword())
     return decryptValuesRecursively(JSON.parse(text), key);
 }
 

@@ -1,0 +1,64 @@
+<!-- This is for an overlay(element injection) that wrapped by external system, so HTML and body tags doesn't exist -->
+<div class="rg-flex rg-flex-col w-full h-full rg-gap-2">
+    <h3 class="rg-font-bold rg-mb-2 rg-flex-0">리스깃 퀵 메뉴</h3>
+    <div>현재 캐릭터: <span id="rg-quick-character"></span></div>
+    <div>현재 채팅: <span id="rg-quick-chat"></span></div>
+    <button id="rg-quick-all-button"
+            class="rg-flex-1 rg-gap1 rg-justify-center rg-bg-green-500 hover:rg-bg-green-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded rg-flex rg-flex-row rg-gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             class="lucide lucide-save-icon lucide-save">
+            <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/>
+            <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/>
+            <path d="M7 3v4a1 1 0 0 0 1 1h7"/>
+        </svg>
+        전체 백업하기
+    </button>
+    <button id="rg-quick-character-button"
+            class="rg-flex-1 rg-gap1 rg-justify-center rg-bg-blue-500 hover:rg-bg-blue-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded rg-flex rg-flex-row rg-gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             class="lucide lucide-message-square-text-icon lucide-message-square-text">
+            <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/>
+            <path d="M7 11h10"/>
+            <path d="M7 15h6"/>
+            <path d="M7 7h8"/>
+        </svg>
+        현재 캐릭터와 전체 채팅 백업하기
+    </button>
+    <button id="rg-quick-chat-button"
+            class="rg-flex-1 rg-gap1 rg-justify-center rg-bg-blue-500 hover:rg-bg-blue-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded rg-flex rg-flex-row rg-gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             class="lucide lucide-message-square-icon lucide-message-square">
+            <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/>
+        </svg>
+        현재 캐릭터와 현재 채팅 백업하기
+    </button>
+    <button id="rg-quick-push-button"
+            class="rg-flex-1 rg-gap1 rg-justify-center rg-bg-green-500 hover:rg-bg-green-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded rg-flex rg-flex-row rg-gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             class="lucide lucide-cloud-upload-icon lucide-cloud-upload">
+            <path d="M12 13v8"/>
+            <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/>
+            <path d="m8 17 4-4 4 4"/>
+        </svg>
+        서버로 보내기
+    </button>
+    <button id="rg-quick-overlay-button"
+            class="rg-flex-1 rg-gap1 rg-justify-center rg-bg-green-500 hover:rg-bg-green-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded rg-flex rg-flex-row rg-gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             class="lucide lucide-app-window-icon lucide-app-window">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path d="M10 4v4"/>
+            <path d="M2 8h20"/>
+            <path d="M6 4v4"/>
+        </svg>
+        패널 표시
+    </button>
+    <button id="rg-quick-close-button"
+            class="rg-bg-red-500 hover:rg-bg-red-700 rg-text-black rg-font-bold rg-py-2 rg-px-4 rg-rounded">닫기
+    </button>
+</div>

@@ -14,14 +14,26 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
     const pushButton = container.querySelector<HTMLButtonElement>("#rg-push-button")
     const pullButton = container.querySelector<HTMLButtonElement>("#rg-pull-button")
     const trimButton = container.querySelector<HTMLButtonElement>("#rg-trim-button")
+    const revertButton = container.querySelector<HTMLButtonElement>("#rg-revert-button")
     const deleteButton = container.querySelector<HTMLButtonElement>("#rg-delete-button")
 
-    if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton) {
+    let buttons: HTMLButtonElement[] = []
+
+    // 타입 체크... 귀찮다...
+    if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton || !revertButton) {
         console.log("버튼... 없다?")
         return;
     }
 
-    let buttons = [closeButton, persistButton, commitButton, pushButton, pullButton, trimButton]
+    function resetButtons() {
+        if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton || !revertButton) {
+            console.log("버튼... 없다?")
+            return;
+        }
+        buttons = [closeButton, persistButton, commitButton, pushButton, pullButton, trimButton, revertButton, deleteButton]
+    }
+
+    resetButtons()
 
     closeButton.addEventListener('click', () => {
         overlay.close()
@@ -88,7 +100,7 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
             return;
         }
 
-        buttons = [closeButton, persistButton, commitButton, pushButton, pullButton, trimButton]
+        resetButtons()
 
         if (history.length == 0) {
             historyContainer.innerHTML = '커밋이 아직 없습니다.'
@@ -132,7 +144,8 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
 
     applyClickHandlerWithSpinner(commitButton, buttons, async (setMessage) => {
         try {
-            const message = prompt('커밋 메시지를 정하세요', '세이브 데이터') ?? '세이브 데이터';
+            const message = prompt('커밋 메시지를 정하세요', '세이브 데이터');
+            if(!message) return;
             const isChanged = await saveDatabaseAndCommit(message, setMessage);
             if (!isChanged) {
                 alert('변경 사항이 없습니다!')
@@ -173,6 +186,22 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
             } else {
                 alert(`서버에서 받는데 실패했습니다: ${reason}`)
             }
+        }
+    })
+
+    applyClickHandlerWithSpinner(revertButton, buttons, async (setMessage) => {
+        try {
+            if (confirm('특정 커밋을 로컬에서, 없는경우 서버에서 받아와 복원을 시도합니다, 계속할까요?')) {
+                const sha = prompt("커밋 ID(sha)를 입력해주세요")
+                if(!sha) {
+                    return;
+                }
+                await revertDatabaseToCommit(sha, setMessage)
+                await refreshCommitHistory();
+                alert("완료되었습니다, 새로고침을 권장합니다.")
+            }
+        } catch (reason: any) {
+            alert(reason)
         }
     })
 

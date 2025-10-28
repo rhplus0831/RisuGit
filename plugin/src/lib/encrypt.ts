@@ -4,8 +4,6 @@ import {getEncryptPassword} from "./configure";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-const testValue = "risu-git-is-awesome-i-dont-know-but-it-is-long-string-for-test-toooooooooooooooooooooooooooooooo-long";
-
 // 한번 만든 키는 잘 변하지 않으므로 캐싱
 let derivedKeyPromise: Promise<CryptoKey> | null = null;
 let cachedPassword: string | null = null;

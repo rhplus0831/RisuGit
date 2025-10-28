@@ -182,7 +182,7 @@ async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, 
         // 작업 B 프로미스 (즉시 실행 함수(IIFE) 형태로 만듦)
         const messageProcessingPromise = (async () => {
             // 메시지가 없는경우, 넘기기
-            if(!messages) {
+            if (!messages) {
                 return;
             }
             // B-1: 메시지 디렉터리 생성 (선행 작업)
@@ -257,6 +257,19 @@ export async function saveCharacterAndCommit(message: string = 'Save data', char
     await ensureGitRepo();
     const encryptKey = await deriveKey(getEncryptPassword());
 
+    const alreadyExist = await fileExists(`${dir}/keytest.json`);
+    if (alreadyExist) {
+        try {
+            await readAndDecryptFromPath(`${dir}/keytest.json`)
+        } catch (e: any) {
+            if (e.toString().indexOf("OperationError") !== -1) {
+                throw new Error(`현재 저장되어 있는 데이터의 복호화에 실패했습니다, 키가 다를 수 있습니다.\n다른 키를 써야 한다면 고유한 다른 저장소를 쓰는것을 권장합니다.`)
+            } else {
+                throw e;
+            }
+        }
+    }
+
     const database = getDatabase()
     for (let characterIndex = 0; characterIndex < database.characters.length; characterIndex++) {
         const character = database.characters[characterIndex];
@@ -305,7 +318,22 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
         if (progressCallback) {
             await progressCallback(`백업중: 기초 데이터...`)
         }
+
+        const alreadyExist = await fileExists(`${dir}/keytest.json`);
+        if (alreadyExist) {
+            try {
+                await readAndDecryptFromPath(`${dir}/keytest.json`)
+            } catch (e: any) {
+                if (e.toString().indexOf("OperationError") !== -1) {
+                    throw new Error(`현재 저장되어 있는 데이터의 복호화에 실패했습니다, 키가 다를 수 있습니다.\n다른 키를 써야 한다면 고유한 다른 저장소를 쓰는것을 권장합니다.`)
+                } else {
+                    throw e;
+                }
+            }
+        }
+
         // 상대적으로 작을 가능성이 높은 데이터는 그대로 저장
+        await writeAndAdd("keytest.json", {"test": crypto.randomUUID()})
         await writeAndAdd(`characterOrder.json`, database.characterOrder)
         await writeAndAdd(`loreBook.json`, database.loreBook)
         await writeAndAdd(`personas.json`, database.personas)
@@ -524,7 +552,7 @@ export async function revertDatabaseToCommit(sha: string, progressCallback: (mes
 
         const remote = 'origin'
         const commitExist = await checkCommitExists(sha);
-        if(!commitExist) {
+        if (!commitExist) {
             await git.fetch({
                 fs,
                 http,
@@ -586,8 +614,11 @@ export async function revertDatabaseToCommit(sha: string, progressCallback: (mes
         console.log(`Revert to branch ${getBranch()}`);
     } catch
         (e: any) {
+        console.log(e)
         if (e.toString().indexOf("CommitNotFetchedError") !== -1) {
             throw new Error("특정 커밋으로 돌아갈 수 없었습니다. 서버가 특정 커밋만 받는 작업을 지원하지 않을 수 있습니다.")
+        } else if (e.toString().indexOf("OperationError") !== -1) {
+            throw new Error(`복호화에 실패했습니다, 키가 다를 수 있습니다.`)
         }
         console.error(`Failed to revert to commit ${sha}:`, e);
         throw e

@@ -53,7 +53,7 @@ export function getGitPassword() {
 }
 
 export function getGitProxy() {
-    const value = getMyArgument("git_password");
+    const value = getMyArgument("git_proxy");
     if (value) return value;
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_PROXY;

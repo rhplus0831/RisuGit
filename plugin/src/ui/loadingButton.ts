@@ -16,7 +16,13 @@ d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 
         loadingButton.innerHTML = `${spinner}작업중...`
 
         disableButtons.forEach((button) => {
+            // 이미 비활성화 된 버튼인경우
+            if (button.classList.contains("flag-disabled")) {
+                return;
+            }
             button.disabled = true;
+            // 비활성화 시 시각적 스타일 추가
+            button.classList.add('rg-opacity-50', 'rg-cursor-not-allowed');
         })
 
         try {
@@ -28,9 +34,16 @@ d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 
         } finally {
             loadingButton.innerHTML = originalInnerHTML;
             disableButtons.forEach((button) => {
+                // 이미 비활성화 된 버튼인경우
+                if (button.classList.contains("flag-disabled")) {
+                    return;
+                }
                 button.disabled = false;
+                // 활성화 시 시각적 스타일 제거
+                button.classList.remove('rg-opacity-50', 'rg-cursor-not-allowed');
             })
         }
     }
+
     loadingButton.onclick = wrapped;
 }

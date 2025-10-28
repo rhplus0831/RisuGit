@@ -3,7 +3,7 @@ import http from 'isomorphic-git/http/web';
 import {ensureScriptLoaded} from "./script-loader";
 import {decryptValuesRecursively, deriveKey, encryptValuesRecursively} from "./encrypt";
 import {getBranch, getClientName, getEncryptKey, getGitId, getGitPassword, getGitProxy, getGitURL} from "./configure";
-import {SlicedCharacter, SlicedChat} from "./database";
+import {IndexedCharacter, SlicedCharacter, SlicedChat} from "./database";
 
 // LightningFS 스크립트 URL
 const LIGHTNING_FS_URL = "https://unpkg.com/@isomorphic-git/lightning-fs";
@@ -263,7 +263,8 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
         await recursiveRmdir(currentFs, `${baseDir}/characters`)
         // 빈 폴더 생성
         await currentFs.promises.mkdir(`${baseDir}/characters`)
-        for (const character of database.characters) {
+        for (let characterIndex = 0; characterIndex < database.characters.length; characterIndex++) {
+            const character = database[characterIndex];
             if (progressCallback) {
                 await progressCallback(`백업중: ${character.name}`)
             }
@@ -275,7 +276,7 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
             const {chats, ...remainingCharacter} = character;
 
             //채팅 데이터를 제외한 나머지 데이터를 저장
-            await writeAndAdd(`${cidDir}/data.json`, remainingCharacter)
+            await writeAndAdd(`${cidDir}/data.json`, {...remainingCharacter, index: characterIndex})
 
             const allChatPromises = character.chats.map(async (chat: SlicedChat, index: number) => {
                 // 경로 정의
@@ -460,7 +461,7 @@ async function decryptCharactersChat(cid: string, chatId: string) {
     };
 }
 
-async function decryptCharacter(cid: string, progressCallback: (message: string) => Promise<void>) {
+async function decryptCharacter(cid: string, progressCallback: (message: string) => Promise<void>): Promise<IndexedCharacter> {
     const cidDir = `${dir}/characters/${cid}`
     let baseData = await readAndDecryptFromPath(`${cidDir}/data.json`);
 
@@ -495,6 +496,33 @@ async function decryptCharacter(cid: string, progressCallback: (message: string)
     };
 }
 
+async function checkCommitExists(oid: string) {
+    try {
+        // 커밋 읽기 시도
+        await git.readCommit({
+            fs: await getFs(),
+            dir,
+            oid: oid
+        });
+
+        // 성공: 커밋이 존재함
+        console.log(`✅ 커밋 ${oid}가 로컬에 존재합니다.`);
+        return true;
+
+    } catch (e: any) {
+        // 실패: 에러 확인
+        if (e.toString().indexOf('NotFoundError') !== -1) {
+            // NotFoundError: 커밋이 존재하지 않음
+            console.log(`❌ 커밋 ${oid}를 로컬에서 찾을 수 없습니다.`);
+            return false;
+        } else {
+            // 그 외 다른 에러 (예: 저장소 손상, 권한 문제 등)
+            console.error(`확인 중 다른 에러 발생: ${e.message}`);
+            throw e; // 예기치 않은 에러는 다시 던져서 처리
+        }
+    }
+}
+
 /**
  * 대상 시점의 모든 데이터를 복원합니다
  * @param sha 대상 지점
@@ -512,6 +540,22 @@ export async function revertDatabaseToCommit(sha: string, progressCallback: (mes
         // 1. 작업 디렉토리를 특정 SHA의 상태로 되돌립니다.
         // force: true 는 커밋되지 않은 로컬 변경 사항을 무시하고 덮어씁니다.
         // 이 작업 후 'detached HEAD' 상태가 됩니다.
+
+        const remote = 'origin'
+
+        await git.fetch({
+            fs,
+            http,
+            dir,
+            remote,
+            ref: sha,           // 1. 브랜치 대신 원하는 SHA를 지정
+            depth: 1,           // 2. 해당 커밋 하나만 가져오도록 설정
+            corsProxy: getGitProxy(),
+            onAuth: () => ({username: getGitId(), password: getGitPassword()}),
+        });
+
+        console.log("Fetch Complete")
+
         await git.checkout({
             fs,
             dir,
@@ -531,14 +575,23 @@ export async function revertDatabaseToCommit(sha: string, progressCallback: (mes
         const statistics = await readAndDecryptFromPath(`${dir}/statistics.json`)
         const botPresets = await readAndDecryptFromPath(`${dir}/botPresets.json`)
 
-        const characters: SlicedCharacter[] = [];
+        const characters: IndexedCharacter[] = [];
         const charactersCIDs = await fs.promises.readdir(dir + "/characters");
         for (const cid of charactersCIDs) {
             characters.push(await decryptCharacter(cid, progressCallback))
         }
 
+        // 3. 채팅 순서 정렬
+        characters.sort((a, b) => a.index - b.index);
+
+        // 4. (Remove Index) 'index' 속성을 제거한 새 배열을 만듭니다.
+        const finalCharacters = characters.map(chat => {
+            const {index, ...rest} = chat;
+            return rest;
+        });
+
         const db = getDatabase();
-        db.characters = characters;
+        db.characters = finalCharacters;
         db.characterOrder = characterOrder;
         db.loreBook = loreBook;
         db.personas = personas;
@@ -549,7 +602,10 @@ export async function revertDatabaseToCommit(sha: string, progressCallback: (mes
         setDatabase(db)
         console.log(`Revert to branch ${getBranch()}`);
     } catch
-        (e) {
+        (e: any) {
+        if (e.toString().indexOf("CommitNotFetchedError") !== -1) {
+            throw new Error("특정 커밋으로 돌아갈 수 없었습니다. 서버가 특정 커밋만 받는 작업을 지원하지 않을 수 있습니다.")
+        }
         console.error(`Failed to revert to commit ${sha}:`, e);
         throw e
     } finally {

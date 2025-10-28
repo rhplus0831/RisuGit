@@ -13,6 +13,10 @@ export interface SlicedCharacter {
     chats: SlicedChat[]
 }
 
+export interface IndexedCharacter extends SlicedCharacter {
+    index: number
+}
+
 /**
  * 프로젝트용으로 저장해야할 부분만 정의한 데이터
  */

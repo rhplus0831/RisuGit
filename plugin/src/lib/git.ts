@@ -179,6 +179,12 @@ async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, 
         // 작업 A 프로미스
         const dataWritePromise = writeAndAdd(`${chatDir}/data.json`, {...remainingChat, index: chatIndex});
 
+        // 저장 대상이 아닌 경우 기초 데이터만 저장 (인덱스 유지용)
+        if (chatID !== undefined && chat.id != chatID) {
+            await dataWritePromise;
+            return;
+        }
+
         // 작업 B 프로미스 (즉시 실행 함수(IIFE) 형태로 만듦)
         const messageProcessingPromise = (async () => {
             // 메시지가 없는경우, 넘기기
@@ -226,19 +232,9 @@ async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, 
     }
 
     let chatPromises: Promise<void>[] = []
-    if (chatID === undefined) {
-        chatPromises = character.chats.map(async (chat: SlicedChat, index: number) => {
-            return saveChat(chat, index)
-        });
-    } else {
-        for (let i = 0; i < character.chats.length; i++) {
-            const chat = character.chats[i];
-            if (chat.id === chatID) {
-                chatPromises = [saveChat(chat, i)]
-                break
-            }
-        }
-    }
+    chatPromises = character.chats.map(async (chat: SlicedChat, index: number) => {
+        return saveChat(chat, index)
+    });
     await Promise.all(chatPromises);
 }
 
@@ -435,11 +431,10 @@ async function decryptCharactersChat(cid: string, chatId: string) {
     try {
         messageFilenames = await fs.promises.readdir(messageDir);
     } catch (err: any) {
-        // 폴더가 없는경우 채팅이 없는 채팅
-        if (err.toString().indexOf("ENOENT") !== -1) {
-            return []
+        // 폴더가 없는경우 채팅이 없는 채팅이므로, 비어있게 냅두면 됨
+        if (err.toString().indexOf("ENOENT") === -1) {
+            throw err;
         }
-        throw err;
     }
 
     // 1. 모든 메시지 읽기 작업을 프로미스 배열로 만듭니다.

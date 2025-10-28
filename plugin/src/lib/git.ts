@@ -31,7 +31,7 @@ export async function getDiskUsage() {
     return {
         quota: quota,
         usage: usage,
-        fs: await calculateFSUsage(await getFs())
+        fs: await calculateFSUsage()
     }
 }
 
@@ -61,14 +61,14 @@ async function ensureGitRepo() {
         return true;
     } catch (err) {
         console.log('Initializing new git repository');
-        await safeMkdir(fs, dir)
+        await safeMkdir(dir)
         await git.init({fs: fs, dir, defaultBranch: getBranch()});
         return false;
     }
 }
 
 export async function deleteRepo() {
-    await recursiveRmdir(await getFs(), '/risudata')
+    await recursiveRmdir('/risudata')
 }
 
 /**
@@ -114,7 +114,7 @@ export async function recloneRepoWithLowDepth() {
         if (localSha !== remoteSha) {
             throw new Error("서버의 커밋 상태와 현재 커밋 상태에 차이가 있습니다. 가져오기를 먼저 진행해주세요.")
         }
-        await recursiveRmdir(fs, '/risudata')
+        await recursiveRmdir('/risudata')
     }
 
     await pullRepository(1)
@@ -149,7 +149,7 @@ async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, 
     const characterDir = `characters`
     const cid = character.chaId;
     const cidDir = `${characterDir}/${cid}`
-    await safeMkdir(fs, `${baseDir}/${cidDir}`)
+    await safeMkdir(`${baseDir}/${cidDir}`)
 
     const {chats, ...remainingCharacter} = character;
     await writeAndAdd(`${cidDir}/data.json`, {...remainingCharacter, index: index})
@@ -167,10 +167,10 @@ async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, 
         const {message: messages, ...remainingChat} = chat;
 
         // 확실하게 비워두기
-        await recursiveRmdir(fs, baseChatDir)
+        await recursiveRmdir(baseChatDir)
 
         // 3. 채팅 기본 디렉터리 생성. (이 작업은 선행되어야 함)
-        await safeMkdir(fs, baseChatDir);
+        await safeMkdir(baseChatDir);
 
         // 4. 이제 병렬로 처리할 수 있는 두 가지 작업이 있습니다.
         //    A: data.json 파일 쓰기
@@ -181,8 +181,12 @@ async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, 
 
         // 작업 B 프로미스 (즉시 실행 함수(IIFE) 형태로 만듦)
         const messageProcessingPromise = (async () => {
+            // 메시지가 없는경우, 넘기기
+            if(!messages) {
+                return;
+            }
             // B-1: 메시지 디렉터리 생성 (선행 작업)
-            await safeMkdir(fs, baseMessageDir);
+            await safeMkdir(baseMessageDir);
 
             const messageWritePromises = messages.map(async (message, index) => {
                 // (중요) 원본 message 객체를 수정하는 대신,
@@ -311,9 +315,9 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
         await writeAndAdd(`botPresets.json`, database.botPresets)
 
         // 일단 폴더를 삭제
-        await recursiveRmdir(fs, `${baseDir}/characters`)
+        await recursiveRmdir(`${baseDir}/characters`)
         // 빈 폴더 생성
-        await safeMkdir(fs, `${baseDir}/characters`);
+        await safeMkdir(`${baseDir}/characters`);
         for (let characterIndex = 0; characterIndex < database.characters.length; characterIndex++) {
             const character = database.characters[characterIndex];
             console.log(`인덱스 ${characterIndex}: ${character}`);
@@ -512,24 +516,26 @@ export async function revertDatabaseToCommit(sha: string, progressCallback: (mes
         console.log(`Attempting to revert to commit: ${sha}`);
 
         // 폴더를 정리
-        await recursiveRmdir(fs, `${dir}/characters`)
+        await recursiveRmdir(`${dir}/characters`)
 
         // 1. 작업 디렉토리를 특정 SHA의 상태로 되돌립니다.
         // force: true 는 커밋되지 않은 로컬 변경 사항을 무시하고 덮어씁니다.
         // 이 작업 후 'detached HEAD' 상태가 됩니다.
 
         const remote = 'origin'
-
-        await git.fetch({
-            fs,
-            http,
-            dir,
-            remote,
-            ref: sha,           // 1. 브랜치 대신 원하는 SHA를 지정
-            depth: 1,           // 2. 해당 커밋 하나만 가져오도록 설정
-            corsProxy: getGitProxy(),
-            onAuth: () => ({username: getGitId(), password: getGitPassword()}),
-        });
+        const commitExist = await checkCommitExists(sha);
+        if(!commitExist) {
+            await git.fetch({
+                fs,
+                http,
+                dir,
+                remote,
+                ref: sha,           // 1. 브랜치 대신 원하는 SHA를 지정
+                depth: 1,           // 2. 해당 커밋 하나만 가져오도록 설정
+                corsProxy: getGitProxy(),
+                onAuth: () => ({username: getGitId(), password: getGitPassword()}),
+            });
+        }
 
         console.log("Fetch Complete")
 

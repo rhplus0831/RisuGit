@@ -14,6 +14,9 @@ let cachedPassword: string | null = null;
  */
 export async function deriveKey(password: string) {
     if (!derivedKeyPromise || !cachedPassword || cachedPassword != password) {
+        if(!password) {
+            throw new Error("암호화 키를 지정해야 합니다")
+        }
         cachedPassword = password
         const keyMaterial = await crypto.subtle.importKey(
             'raw',

@@ -16,6 +16,16 @@ function getMyArgument(name: string) {
     return globalThis.__pluginApis__.getArg(`RisuGit::${name}`)
 }
 
+export function getBoolean(name: string, defaultValue: boolean) {
+    const value = getMyArgument(name);
+    // 값이 비어있으면 true
+    if (!value) {
+        return defaultValue;
+    }
+
+    return value == 1 || value == "1" || value.toString().toLowerCase() == "true";
+}
+
 export function getEncryptPassword() {
     const value = getMyArgument("encrypt_key");
     if (value) return value;
@@ -79,4 +89,12 @@ export function getClientName() {
         name = "이름없음"
     }
     return name;
+}
+
+export function getAutoSave() {
+    return getBoolean("git_autosave", true);
+}
+
+export function getAutoPush() {
+    return getBoolean("git_autopush", true);
 }

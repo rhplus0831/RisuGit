@@ -13,6 +13,8 @@ function main() {
 //@arg git_proxy string
 //@arg git_branch string
 //@arg git_client_name string
+//@arg git_autosave string
+//@arg git_autopush string
 
 `
     const newContent = `${header}\n\n${content}`;

@@ -10,7 +10,7 @@ import {
     getGitProxy,
     getGitURL
 } from "./configure";
-import {IndexedCharacter, SlicedCharacter, SlicedChat} from "./database";
+import {IndexedCharacter, SlicedCharacter, SlicedChat} from "./risu";
 import {calculateFSUsage, fileExists, getFs, recursiveRmdir, safeMkdir} from "./fs";
 
 const dir = '/risudata';

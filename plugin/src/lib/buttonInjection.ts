@@ -111,6 +111,10 @@ async function getToolbar() {
     }
 }
 
-makeMutationObserver([getToolbar, getSetting]);
+const observer = makeMutationObserver([getToolbar, getSetting]);
+
+export function unloadButton() {
+    observer.disconnect()
+}
 
 export {};

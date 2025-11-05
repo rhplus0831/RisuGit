@@ -1,3 +1,5 @@
+// LICENSED: https://github.com/kwaroran/RisuAI/blob/main/LICENSE
+
 export interface SlicedMessage {
     chatId: string,
     data: string
@@ -33,3 +35,24 @@ export interface SlicedDatabase {
     statistics: any;
     botPresets: any[];
 }
+
+export interface OpenAIChat{
+    role: 'system'|'user'|'assistant'|'function'
+    content: string
+    memo?:string
+    name?:string
+    removable?:boolean
+    attr?:string[]
+    multimodals?: MultiModal[]
+    thoughts?: string[]
+    cachePoint?: boolean
+}
+
+export interface MultiModal{
+    type:'image'|'video'|'audio'
+    base64:string,
+    height?:number,
+    width?:number
+}
+
+type ReplacerFunction = (content: OpenAIChat[], type: string) => OpenAIChat[] | Promise<OpenAIChat[]>

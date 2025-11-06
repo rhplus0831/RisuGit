@@ -117,6 +117,7 @@ export async function safeMkdir(path: string) {
         const fs = await getFs();
         await fs.promises.mkdir(path)
     } catch (e: any) {
+        console.log(e)
         if (e.toString().indexOf('EEXIST') !== -1) {
             return;
         } else {
@@ -132,6 +133,7 @@ export async function recursiveRmdir(dir: string) {
         // 1. Read all files and folders in the directory
         entries = await fs.promises.readdir(dir);
     } catch (err: any) {
+        console.log(err)
         if (err.toString().indexOf("ENOENT") !== -1) {
             return;
         }

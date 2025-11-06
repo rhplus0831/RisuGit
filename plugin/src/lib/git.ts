@@ -1,4 +1,4 @@
-import git, {ReadCommitResult} from "isomorphic-git";
+import git, {ReadCommitResult, remove, statusMatrix} from "isomorphic-git";
 import http from 'isomorphic-git/http/web';
 import {decryptValuesRecursively, deriveKey, encryptValuesRecursively} from "./encrypt";
 import {
@@ -69,6 +69,50 @@ async function ensureGitRepo() {
 
 export async function deleteRepo() {
     await recursiveRmdir('/risudata')
+}
+
+/**
+ * 작업 디렉터리에서 삭제된 모든 파일을 찾아 스테이징(remove)합니다.
+ * (git add -u 와 유사하게 동작)
+ * @param {string} dir - 저장소 경로
+ */
+async function stageAllDeletedFiles() {
+    const fs = await getFs()
+    try {
+        // 1. 저장소 상태 매트릭스를 가져옵니다.
+        const matrix = await statusMatrix({fs, dir});
+
+        // 2. 삭제된 파일(Stage=1, Workdir=0)만 필터링합니다.
+        const deletedFiles = matrix
+            .filter(([filepath, head, workdir, stage]) => {
+                // head: 1 (committed)
+                // workdir: 0 (deleted)
+                // stage: 1 (tracked in index)
+                return stage === 1 && workdir === 0;
+            })
+            .map(([filepath]) => filepath); // 파일 경로만 추출
+
+        if (deletedFiles.length === 0) {
+            console.log('스테이징할 삭제된 파일이 없습니다.');
+            return;
+        }
+
+        console.log('삭제 스테이징 대상:', deletedFiles);
+
+        // 3. 삭제된 파일 목록을 순회하며 'remove' 명령 실행
+        // (Promise.all을 사용해 병렬로 처리 가능)
+        await Promise.all(
+            deletedFiles.map(filepath => {
+                console.log(`Staging deletion: ${filepath}`);
+                return remove({fs, dir, filepath});
+            })
+        );
+
+        console.log('모든 삭제된 파일이 스테이징되었습니다.');
+
+    } catch (error) {
+        console.error('삭제 파일 스테이징 중 오류 발생:', error);
+    }
 }
 
 /**
@@ -191,6 +235,9 @@ async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, 
             if (!messages) {
                 return;
             }
+            // 이전 내역 지우기
+            await recursiveRmdir(baseMessageDir);
+            console.log("remove?")
             // B-1: 메시지 디렉터리 생성 (선행 작업)
             await safeMkdir(baseMessageDir);
 
@@ -274,6 +321,8 @@ export async function saveCharacterAndCommit(message: string = 'Save data', char
         }
     }
 
+    await stageAllDeletedFiles();
+
     // 4. 커밋 실행
     const sha = await git.commit({
         fs: fs,
@@ -350,6 +399,8 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
             }
             await saveCharacter(encryptKey, character, characterIndex, undefined)
         }
+
+        await stageAllDeletedFiles();
 
         // 4. 커밋 실행
         const sha = await git.commit({

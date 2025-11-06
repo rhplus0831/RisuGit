@@ -92,9 +92,13 @@ export function getClientName() {
 }
 
 export function getAutoSave() {
-    return getBoolean("git_autosave", true);
+    return getBoolean("git_autosave", process.env.NODE_ENV === 'development');
 }
 
 export function getAutoPush() {
-    return getBoolean("git_autopush", true);
+    return getBoolean("git_autopush", process.env.NODE_ENV === 'development');
+}
+
+export function getBootstrap() {
+    return getBoolean("git_bootstrap", process.env.NODE_ENV === 'development')
 }

@@ -36,7 +36,10 @@ export function getEncryptPassword() {
 }
 
 export function getGitURL() {
-    const value = getMyArgument("git_url");
+    let value: string = getMyArgument("git_url");
+    if (value.endsWith("/")) {
+        value = value.slice(0, -1)
+    }
     if (value) return value;
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_URL;

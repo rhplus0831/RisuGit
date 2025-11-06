@@ -1,4 +1,4 @@
-import {getBootstrap, getAutoPush, getAutoSave, remoteIsValid} from "./configure";
+import {getBootstrap, getAutoPush, getAutoSave, remoteIsValid, getBootstrapFull} from "./configure";
 import {pullRepository, pushRepository, saveCharacterAndCommit, saveDatabaseAndCommit} from "./git";
 import {SlicedChat} from "./risu";
 
@@ -57,6 +57,9 @@ function hideGitIndicator(): void {
             showOrUpdateGitIndicator("데이터 가져오는중...", indicator)
             await pullRepository()
         }
+
+        if(!getBootstrapFull()) return;
+
         await saveDatabaseAndCommit("자동 저장", async (message) => {
             showOrUpdateGitIndicator('자동 저장: ' + message, indicator)
         })

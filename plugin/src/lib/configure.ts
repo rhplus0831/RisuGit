@@ -102,3 +102,7 @@ export function getAutoPush() {
 export function getBootstrap() {
     return getBoolean("git_bootstrap", process.env.NODE_ENV === 'development')
 }
+
+export function getBootstrapFull() {
+    return getBoolean("git_bootstrap_full", false)
+}

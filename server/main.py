@@ -15,11 +15,13 @@ from utils import get_file_hash, verify_file_type
 # { "filename": "last_access_attempt_time" }
 get_request_cache = {}
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
     # await cleanup_old_files()
     yield
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -31,6 +33,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.middleware("http")
 async def check_risu_git_flag(request: Request, call_next):
     if "x-risu-git-flag" not in request.headers:
@@ -38,12 +41,13 @@ async def check_risu_git_flag(request: Request, call_next):
     response = await call_next(request)
     return response
 
+
 @app.put("/{filename}")
 async def upload_file(
-    filename: str,
-    file: UploadFile = File(...),
-    session: Session = Depends(get_session),
-    storage: BaseStorage = Depends(get_storage),
+        filename: str,
+        file: UploadFile = File(...),
+        session: Session = Depends(get_session),
+        storage: BaseStorage = Depends(get_storage),
 ):
     if file.size > settings.MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File is too large")
@@ -80,11 +84,12 @@ async def upload_file(
 
     return {"status": "ok"}
 
+
 @app.get("/{filename}")
 async def get_file(
-    filename: str,
-    session: Session = Depends(get_session),
-    storage: BaseStorage = Depends(get_storage),
+        filename: str,
+        session: Session = Depends(get_session),
+        storage: BaseStorage = Depends(get_storage),
 ):
     now = datetime.utcnow()
     if filename in get_request_cache:
@@ -115,11 +120,11 @@ async def get_file(
             raise HTTPException(status_code=404, detail="File not found")
     return RedirectResponse(url=f"{settings.ASSET_URL}/{filename}")
 
+
 @app.head("/{filename}")
 async def head_file(
-    filename: str,
-    session: Session = Depends(get_session),
-    storage: BaseStorage = Depends(get_storage),
+        filename: str,
+        session: Session = Depends(get_session),
 ):
     asset = session.exec(select(Asset).where(Asset.filename == filename)).first()
     if not asset:
@@ -130,24 +135,10 @@ async def head_file(
 
     return Response(status_code=200)
 
-@app.get("/file_exists/{filename}")
-async def file_exists(
-    filename: str,
-    session: Session = Depends(get_session),
-    storage: BaseStorage = Depends(get_storage),
-):
-    asset = session.exec(select(Asset).where(Asset.filename == filename)).first()
-    if not asset:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    # if not await storage.exists(filename):
-    #     raise HTTPException(status_code=404, detail="File not found")
-
-    return {"status": "ok"}
 
 async def cleanup_old_files(
-    session: Session = next(get_session()),
-    storage: BaseStorage = get_storage(),
+        session: Session = next(get_session()),
+        storage: BaseStorage = get_storage(),
 ):
     sixty_days_ago = datetime.utcnow() - timedelta(days=60)
     old_assets = session.exec(select(Asset).where(Asset.last_accessed_date < sixty_days_ago)).all()
@@ -158,6 +149,8 @@ async def cleanup_old_files(
 
     session.commit()
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

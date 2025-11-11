@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse, Response
 from sqlmodel import Session, select
 from contextlib import asynccontextmanager
 
@@ -57,8 +57,8 @@ async def upload_file(
     if base_filename != file_hash:
         raise HTTPException(status_code=400, detail="Filename does not match file hash")
 
-    if not verify_file_type(file, file.content_type):
-        raise HTTPException(status_code=400, detail="File content does not match file type")
+    # if not verify_file_type(file, file.content_type):
+    #     raise HTTPException(status_code=400, detail="File content does not match file type")
 
     await storage.save(file, filename)
 
@@ -84,11 +84,17 @@ async def upload_file(
 async def get_file(
     filename: str,
     session: Session = Depends(get_session),
+    storage: BaseStorage = Depends(get_storage),
 ):
     now = datetime.utcnow()
     if filename in get_request_cache:
         last_attempt = get_request_cache[filename]
         if now - last_attempt < timedelta(hours=1):
+            if settings.STORAGE_TYPE == "local":
+                if await storage.exists(filename):
+                    return FileResponse(storage.get_path(filename))
+                else:
+                    raise HTTPException(status_code=404, detail="File not found")
             return RedirectResponse(url=f"{settings.ASSET_URL}/{filename}")
 
     asset = session.exec(select(Asset).where(Asset.filename == filename)).first()
@@ -102,7 +108,42 @@ async def get_file(
 
     get_request_cache[filename] = now
 
+    if settings.STORAGE_TYPE == "local":
+        if await storage.exists(filename):
+            return FileResponse(storage.get_path(filename))
+        else:
+            raise HTTPException(status_code=404, detail="File not found")
     return RedirectResponse(url=f"{settings.ASSET_URL}/{filename}")
+
+@app.head("/{filename}")
+async def head_file(
+    filename: str,
+    session: Session = Depends(get_session),
+    storage: BaseStorage = Depends(get_storage),
+):
+    asset = session.exec(select(Asset).where(Asset.filename == filename)).first()
+    if not asset:
+        return Response(status_code=404)
+
+    # if not await storage.exists(filename):
+    #     return Response(status_code=404)
+
+    return Response(status_code=200)
+
+@app.get("/file_exists/{filename}")
+async def file_exists(
+    filename: str,
+    session: Session = Depends(get_session),
+    storage: BaseStorage = Depends(get_storage),
+):
+    asset = session.exec(select(Asset).where(Asset.filename == filename)).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # if not await storage.exists(filename):
+    #     raise HTTPException(status_code=404, detail="File not found")
+
+    return {"status": "ok"}
 
 async def cleanup_old_files(
     session: Session = next(get_session()),

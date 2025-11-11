@@ -14,23 +14,38 @@ class BaseStorage(ABC):
     async def delete(self, filename: str) -> None:
         pass
 
+    @abstractmethod
+    async def exists(self, filename: str) -> bool:
+        pass
+
+    @abstractmethod
+    def get_path(self, filename: str) -> str:
+        pass
+
 class LocalStorage(BaseStorage):
     def __init__(self, path: str):
         self.path = path
         if not os.path.exists(path):
             os.makedirs(path)
 
+    def get_path(self, filename: str) -> str:
+        return os.path.join(self.path, filename)
+
     async def save(self, file: UploadFile, filename: str) -> None:
-        file_path = os.path.join(self.path, filename)
+        file_path = self.get_path(filename)
         async with aiofiles.open(file_path, "wb") as f:
             while content := await file.read(1024 * 1024):  # Read in 1MB chunks
                 await f.write(content)
         await file.seek(0)
 
     async def delete(self, filename: str) -> None:
-        file_path = os.path.join(self.path, filename)
+        file_path = self.get_path(filename)
         if os.path.exists(file_path):
             os.remove(file_path)
+
+    async def exists(self, filename: str) -> bool:
+        file_path = self.get_path(filename)
+        return os.path.exists(file_path)
 
 class S3Storage(BaseStorage):
     def __init__(self, endpoint_url, access_key, secret_key, bucket_name):
@@ -48,6 +63,19 @@ class S3Storage(BaseStorage):
 
     async def delete(self, filename: str) -> None:
         self.client.delete_object(bucket=self.bucket_name, key=filename)
+
+    async def exists(self, filename: str) -> bool:
+        try:
+            self.client.head_object(Bucket=self.bucket_name, Key=filename)
+            return True
+        except self.client.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "404":
+                return False
+            else:
+                raise
+
+    def get_path(self, filename: str) -> str:
+        raise NotImplementedError("S3 storage does not support local paths")
 
 def get_storage() -> BaseStorage:
     if settings.STORAGE_TYPE == "s3":

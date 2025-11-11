@@ -17,6 +17,7 @@ function main() {
 //@arg git_autopush string
 //@arg git_bootstrap string
 //@arg git_bootstrap_full string
+//@arg git_asset_server string
 
 `
     const newContent = `${header}\n\n${content}`;

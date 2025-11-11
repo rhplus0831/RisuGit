@@ -46,6 +46,7 @@ esbuild.context({
         'process.env.RISU_GIT_PASSWORD': JSON.stringify(process.env.RISU_GIT_PASSWORD),
         'process.env.RISU_GIT_PROXY': JSON.stringify(process.env.RISU_GIT_PROXY),
         'process.env.RISU_ENCRYPT_KEY': JSON.stringify(process.env.RISU_ENCRYPT_KEY),
+        'process.env.RISU_GIT_ASSET_SERVER': JSON.stringify(process.env.RISU_GIT_ASSET_SERVER),
     },
     outfile: 'dist/index.js',
     plugins: [{

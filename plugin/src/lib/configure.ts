@@ -7,6 +7,7 @@ declare const process: {
         RISU_GIT_ID: string;
         RISU_GIT_PASSWORD: string;
         RISU_GIT_PROXY: string;
+        RISU_GIT_ASSET_SERVER: string;
     }
 };
 
@@ -108,4 +109,13 @@ export function getBootstrap() {
 
 export function getBootstrapFull() {
     return getBoolean("git_bootstrap_full", false)
+}
+
+export function getAssetServer() {
+    const value = getMyArgument("git_asset_server");
+    if (value) return value;
+    if (process.env.NODE_ENV === 'development') {
+        return process.env.RISU_GIT_ASSET_SERVER;
+    }
+    return "";
 }

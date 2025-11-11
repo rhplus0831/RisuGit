@@ -1,7 +1,7 @@
 import {BaseOverlay} from "./baseOverlay";
 import {applyClickHandlerWithSpinner, disableButtonIfRemoteIsInvalid} from "./loadingButton";
 import {pushRepository, saveCharacterAndCommit, saveDatabaseAndCommit} from "../lib/git";
-import overlayTemplate from '../ui/settings.html';
+import overlayTemplate from './panel.html';
 
 export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivElement) {
     const closeButton = container.querySelector<HTMLButtonElement>('#rg-quick-close-button');
@@ -92,7 +92,7 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
 
     overlayButton.addEventListener('click', async () => {
         const overlay = new BaseOverlay()
-        await overlay.show(overlayTemplate, "settings")
+        await overlay.show(overlayTemplate, "panel")
     })
 
     return undefined;

@@ -1,5 +1,5 @@
 import {BaseOverlay} from "../ui/baseOverlay";
-import overlayTemplate from '../ui/settings.html';
+import overlayTemplate from '../ui/panel.html';
 import chatTemplate from '../ui/quick.html';
 // @ts-ignore
 import tailwindStyles from '../../dist/main.css';
@@ -68,7 +68,7 @@ async function getSetting() {
         }
     }
     button.onclick = () => {
-        settingOverlay.show(overlayTemplate, 'settings');
+        settingOverlay.show(overlayTemplate, 'panel');
     }
 }
 

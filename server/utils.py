@@ -2,11 +2,9 @@ import hashlib
 import magic
 from fastapi import UploadFile
 
-async def get_file_hash(file: UploadFile) -> str:
+async def get_file_hash(data: bytes) -> str:
     sha256_hash = hashlib.sha256()
-    while chunk := await file.read(8192):
-        sha256_hash.update(chunk)
-    await file.seek(0)
+    sha256_hash.update(data)
     return sha256_hash.hexdigest()
 
 def verify_file_type(file: UploadFile, expected_type: str) -> bool:

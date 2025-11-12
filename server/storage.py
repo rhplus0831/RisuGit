@@ -1,13 +1,13 @@
 import os
 import aiofiles
-import boto3
+import aioboto3
 from abc import ABC, abstractmethod
-from fastapi import UploadFile
 from config import settings
+from botocore.exceptions import ClientError
 
 class BaseStorage(ABC):
     @abstractmethod
-    async def save(self, file: UploadFile, filename: str) -> None:
+    async def save(self, data: bytes, filename: str) -> None:
         pass
 
     @abstractmethod
@@ -31,12 +31,10 @@ class LocalStorage(BaseStorage):
     def get_path(self, filename: str) -> str:
         return os.path.join(self.path, filename)
 
-    async def save(self, file: UploadFile, filename: str) -> None:
+    async def save(self, data: bytes, filename: str) -> None:
         file_path = self.get_path(filename)
         async with aiofiles.open(file_path, "wb") as f:
-            while content := await file.read(1024 * 1024):  # Read in 1MB chunks
-                await f.write(content)
-        await file.seek(0)
+            await f.write(data)
 
     async def delete(self, filename: str) -> None:
         file_path = self.get_path(filename)
@@ -49,33 +47,36 @@ class LocalStorage(BaseStorage):
 
 class S3Storage(BaseStorage):
     def __init__(self, endpoint_url, access_key, secret_key, bucket_name):
-        self.client = boto3.client(
-            "s3",
-            endpoint_url=endpoint_url,
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-        )
+        self.session = aioboto3.Session()
+        self.client_config = {
+            "endpoint_url": endpoint_url,
+            "aws_access_key_id": access_key,
+            "aws_secret_access_key": secret_key,
+        }
         self.bucket_name = bucket_name
 
-    async def save(self, file: UploadFile, filename: str) -> None:
-        self.client.upload_fileobj(file.file, self.bucket_name, filename)
-        await file.seek(0)
+    async def save(self, data: bytes, filename: str) -> None:
+        async with self.session.client("s3", **self.client_config) as s3:
+            await s3.put_object(Bucket=self.bucket_name, Key=filename, Body=data)
 
     async def delete(self, filename: str) -> None:
-        self.client.delete_object(bucket=self.bucket_name, key=filename)
+        async with self.session.client("s3", **self.client_config) as s3:
+            await s3.delete_object(Bucket=self.bucket_name, Key=filename)
 
     async def exists(self, filename: str) -> bool:
-        try:
-            self.client.head_object(Bucket=self.bucket_name, Key=filename)
-            return True
-        except self.client.exceptions.ClientError as e:
-            if e.response["Error"]["Code"] == "404":
-                return False
-            else:
-                raise
+        async with self.session.client("s3", **self.client_config) as s3:
+            try:
+                await s3.head_object(Bucket=self.bucket_name, Key=filename)
+                return True
+            except ClientError as e:
+                if e.response["Error"]["Code"] == "404":
+                    return False
+                else:
+                    raise
 
     def get_path(self, filename: str) -> str:
         raise NotImplementedError("S3 storage does not support local paths")
+
 
 def get_storage() -> BaseStorage:
     if settings.STORAGE_TYPE == "s3":

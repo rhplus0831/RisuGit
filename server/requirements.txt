@@ -2,6 +2,5 @@ fastapi[standard]
 uvicorn[standard]
 sqlmodel
 pillow
-boto3
-python-magic
 aiofiles
+aioboto3

@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from config import settings
 from database import create_db_and_tables, get_session, Asset
 from storage import get_storage, BaseStorage
-from utils import get_file_hash, verify_file_type
+from utils import get_file_hash
 
 # In-memory cache for GET request cooldowns
 # { "filename": "last_access_attempt_time" }
@@ -161,4 +161,4 @@ async def cleanup_old_files(
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=41839)

@@ -56,3 +56,4 @@ class Settings:
 
 
 settings = Settings()
+print("Using: " + settings.STORAGE_TYPE)

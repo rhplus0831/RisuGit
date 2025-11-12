@@ -2,7 +2,7 @@ import {BaseOverlay} from "./baseOverlay";
 import {pushRepository, mergeCommit} from "../lib/git";
 import {applyClickHandlerWithSpinner} from "./loadingButton";
 
-export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivElement) {
+export function mergeLogic(overlay: BaseOverlay, container: HTMLDivElement) {
     const closeButton = container.querySelector<HTMLButtonElement>('#rg-merge-close-button');
 
     closeButton?.addEventListener('click', () => {
@@ -14,7 +14,7 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
 
     if (!localMergeButton || !remoteMergeButton) {
         console.log("버튼... 없다?")
-        return;
+        return undefined;
     }
 
     applyClickHandlerWithSpinner(localMergeButton, [localMergeButton, remoteMergeButton], async () => {

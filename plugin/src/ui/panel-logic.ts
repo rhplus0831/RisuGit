@@ -10,9 +10,13 @@ import {
     saveDatabaseAndCommit
 } from "../lib/git";
 import mergeTemplate from './merge.html';
+import progressTemplate from './progress.html';
 import {applyClickHandlerWithSpinner, disableButtonIfRemoteIsInvalid} from "./loadingButton";
+import {mergeLogic} from "./merge-logic";
+import {assetPushLogic} from "./asset-push-logic";
+import {assetPullLogic} from "./asset-pull-logic";
 
-export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivElement) {
+export function panelLogic(overlay: BaseOverlay, container: HTMLDivElement) {
     const closeButton = container.querySelector<HTMLButtonElement>('#rg-close-button');
     const persistButton = container.querySelector<HTMLButtonElement>('#rg-persist-button');
     const commitButton = container.querySelector<HTMLButtonElement>("#rg-commit-button")
@@ -21,21 +25,23 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
     const trimButton = container.querySelector<HTMLButtonElement>("#rg-trim-button")
     const revertButton = container.querySelector<HTMLButtonElement>("#rg-revert-button")
     const deleteButton = container.querySelector<HTMLButtonElement>("#rg-delete-button")
+    const assetPushButton = container.querySelector<HTMLButtonElement>("#rg-push-asset")
+    const assetPullButton = container.querySelector<HTMLButtonElement>("#rg-pull-asset")
 
     let buttons: HTMLButtonElement[] = []
 
     // 타입 체크... 귀찮다...
-    if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton || !revertButton) {
+    if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton || !revertButton || !assetPushButton) {
         console.log("버튼... 없다?")
         return;
     }
 
     function resetButtons() {
-        if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton || !revertButton) {
+        if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton || !revertButton || !assetPushButton) {
             console.log("버튼... 없다?")
             return;
         }
-        buttons = [closeButton, persistButton, commitButton, pushButton, pullButton, trimButton, revertButton, deleteButton]
+        buttons = [closeButton, persistButton, commitButton, pushButton, pullButton, trimButton, revertButton, deleteButton, assetPushButton]
     }
 
     resetButtons()
@@ -177,7 +183,7 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
                 mergeOverlay.extraCleanup = () => {
                     refreshCommitHistory().then()
                 }
-                mergeOverlay.show(mergeTemplate, "merge").then()
+                mergeOverlay.show(mergeTemplate, mergeLogic).then()
             } else {
                 alert(`서버에 올리는데 실패했습니다: ${reason}`)
             }
@@ -235,6 +241,18 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
             alert(reason)
         }
     })
+
+    assetPushButton.onclick = () => {
+        const overlay = new BaseOverlay();
+        overlay.show(progressTemplate, assetPushLogic)
+    }
+
+    if (assetPullButton) {
+        assetPullButton.onclick = () => {
+            const overlay = new BaseOverlay();
+            overlay.show(progressTemplate, assetPullLogic)
+        }
+    }
 
     refreshCommitHistory().then()
 

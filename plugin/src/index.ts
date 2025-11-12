@@ -1,6 +1,7 @@
 import {Buffer} from 'buffer';
 import {unloadButton} from "./lib/buttonInjection";
 import {unloadReplacer} from "./lib/automatic";
+import {getAssetList} from "./lib/asset";
 
 globalThis.Buffer = Buffer;
 
@@ -16,3 +17,5 @@ onUnload(() => {
     unloadButton();
     unloadReplacer()
 })
+
+console.log(getAssetList())

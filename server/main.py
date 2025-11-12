@@ -36,8 +36,8 @@ app.add_middleware(
 
 @app.middleware("http")
 async def check_risu_git_flag(request: Request, call_next):
-    if "x-risu-git-flag" not in request.headers:
-        return HTTPException(status_code=400, detail="x-risu-git-flag header is missing")
+    if request.method.lower() != "options" and "x-risu-git-flag" not in request.headers:
+        return Response(status_code=400)
     response = await call_next(request)
     return response
 
@@ -49,20 +49,11 @@ async def upload_file(
         session: Session = Depends(get_session),
         storage: BaseStorage = Depends(get_storage),
 ):
+    if '/' in filename:
+        raise HTTPException(status_code=400, detail="Path is contains a slash")
+
     if file.size > settings.MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File is too large")
-
-    if file.content_type not in settings.ALLOWED_MIME_TYPES:
-        raise HTTPException(status_code=415, detail="Unsupported file type")
-
-    file_hash = await get_file_hash(file)
-    base_filename, _ = os.path.splitext(filename)
-
-    if base_filename != file_hash:
-        raise HTTPException(status_code=400, detail="Filename does not match file hash")
-
-    # if not verify_file_type(file, file.content_type):
-    #     raise HTTPException(status_code=400, detail="File content does not match file type")
 
     await storage.save(file, filename)
 
@@ -91,6 +82,11 @@ async def get_file(
         session: Session = Depends(get_session),
         storage: BaseStorage = Depends(get_storage),
 ):
+    if '/' in filename:
+        raise HTTPException(status_code=400, detail="Path is contains a slash")
+
+    cache_headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+
     now = datetime.utcnow()
     if filename in get_request_cache:
         last_attempt = get_request_cache[filename]
@@ -115,10 +111,10 @@ async def get_file(
 
     if settings.STORAGE_TYPE == "local":
         if await storage.exists(filename):
-            return FileResponse(storage.get_path(filename))
+            return FileResponse(storage.get_path(filename), headers=cache_headers)
         else:
             raise HTTPException(status_code=404, detail="File not found")
-    return RedirectResponse(url=f"{settings.ASSET_URL}/{filename}")
+    return RedirectResponse(url=f"{settings.ASSET_URL}/{filename}", headers=cache_headers)
 
 
 @app.head("/{filename}")
@@ -126,14 +122,19 @@ async def head_file(
         filename: str,
         session: Session = Depends(get_session),
 ):
+    if '/' in filename:
+        raise HTTPException(status_code=400, detail="Path is contains a slash")
+
     asset = session.exec(select(Asset).where(Asset.filename == filename)).first()
     if not asset:
         return Response(status_code=404)
 
+    cache_headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+
     # if not await storage.exists(filename):
     #     return Response(status_code=404)
 
-    return Response(status_code=200)
+    return Response(status_code=200, headers=cache_headers)
 
 
 async def cleanup_old_files(

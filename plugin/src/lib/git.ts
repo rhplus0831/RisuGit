@@ -11,7 +11,7 @@ import {
     getGitURL
 } from "./configure";
 import {IndexedCharacter, SlicedCharacter, SlicedChat} from "./risu";
-import {calculateFSUsage, fileExists, getFs, recursiveRmdir, safeMkdir} from "./fs";
+import {calculateFSUsage, deleteFile, fileExists, getFs, recursiveRmdir, safeMkdir} from "./fs";
 
 const dir = '/risudata';
 const baseDir = dir;
@@ -183,8 +183,6 @@ async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, 
         await _writeAndAdd(encryptKey, filepath, data)
     }
 
-    const fs = getFs();
-
     const currentFullBackup = await fileExists('/risudata/characterOrder.json')
     if (!currentFullBackup) {
         throw new Error("전체 백업을 한번은 수행해야 합니다")
@@ -193,10 +191,30 @@ async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, 
     const characterDir = `characters`
     const cid = character.chaId;
     const cidDir = `${characterDir}/${cid}`
-    await safeMkdir(`${baseDir}/${cidDir}`)
+
+    // 마지막 접근일자 확인, 누르기만 해도 업데이트 되기 때문에 이 값이 변하지 않은경우 넘겨도 무관
+    const dataFile = `${dir}/${cidDir}/data.json`
+    try {
+        const data = await readAndDecryptFromPath(dataFile)
+        console.log(`${data.lastInteraction} =? ${character.lastInteraction}`)
+        if (data.lastInteraction == character.lastInteraction) {
+            return;
+        }
+
+        // 백업을 해야 하는 경우 일단 파일을 지움, 채팅 백업중 날아간 경우 이후 백업이 되지 못할 수도 있음
+        await deleteFile(dataFile)
+    } catch (e: any) {
+        console.log(e)
+    }
 
     const {chats, ...remainingCharacter} = character;
-    await writeAndAdd(`${cidDir}/data.json`, {...remainingCharacter, index: index})
+
+    // 채팅 아이디를 따로 지정하지 않은경우 전부 날리기
+    if(chatID === undefined) {
+        await recursiveRmdir(`${baseDir}/${cidDir}`)
+    }
+
+    await safeMkdir(`${baseDir}/${cidDir}`)
 
     const encoder = new TextEncoder();
 
@@ -283,6 +301,9 @@ async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, 
         return saveChat(chat, index)
     });
     await Promise.all(chatPromises);
+
+    // 마지막으로 데이터 파일 작성
+    await writeAndAdd(`${cidDir}/data.json`, {...remainingCharacter, index: index})
 }
 
 /**
@@ -387,10 +408,6 @@ export async function saveDatabaseAndCommit(message: string = 'Save data', progr
         await writeAndAdd(`statistics.json`, database.statistics)
         await writeAndAdd(`botPresets.json`, database.botPresets)
 
-        // 일단 폴더를 삭제
-        await recursiveRmdir(`${baseDir}/characters`)
-        // 빈 폴더 생성
-        await safeMkdir(`${baseDir}/characters`);
         for (let characterIndex = 0; characterIndex < database.characters.length; characterIndex++) {
             const character = database.characters[characterIndex];
             console.log(`인덱스 ${characterIndex}: ${character}`);
@@ -779,7 +796,8 @@ export async function pullRepository(depth: number | undefined = undefined) {
                 fs: fs,
                 dir,
                 ref: branch,
-                remote
+                remote,
+                force: true
             });
         }
 

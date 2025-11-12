@@ -157,3 +157,7 @@ export async function recursiveRmdir(dir: string) {
     // 5. After the directory is empty, delete it
     await fs.promises.rmdir(dir);
 }
+
+export async function deleteFile(path: string) {
+    await (await getFs()).promises.unlink(path)
+}

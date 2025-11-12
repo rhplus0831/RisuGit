@@ -6,7 +6,7 @@ export class BaseOverlay {
     private cleanup: (() => void) | null | undefined = null;
     public extraCleanup: (() => void) | null = null;
 
-    async show(html: string, logic: "panel" | "merge" | "quick") {
+    async show(html: string, logic: (overlay: BaseOverlay, element: HTMLDivElement) => any) {
         if (this.element) return; // 이미 열려있으면 무시
 
         const content = html
@@ -21,17 +21,7 @@ export class BaseOverlay {
 
         document.body.appendChild(this.element);
 
-        // TypeScript 로직 초기화
-        if (logic == "panel") {
-            const {initializeOverlayLogic} = await import('./panel-logic');
-            this.cleanup = initializeOverlayLogic(this, this.element);
-        } else if (logic == "merge") {
-            const {initializeOverlayLogic} = await import('./merge-logic');
-            this.cleanup = initializeOverlayLogic(this, this.element);
-        } else if (logic == "quick") {
-            const {initializeOverlayLogic} = await import('./quick-logic');
-            this.cleanup = initializeOverlayLogic(this, this.element);
-        }
+        this.cleanup = logic(this, this.element);
     }
 
     close() {

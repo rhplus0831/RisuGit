@@ -36,12 +36,16 @@ export function getEncryptPassword() {
     return "";
 }
 
+function wrapURL(url: string): string {
+    if (url.endsWith("/")) {
+        return url.slice(0, -1)
+    }
+    return url
+}
+
 export function getGitURL() {
     let value: string = getMyArgument("git_url");
-    if (value.endsWith("/")) {
-        value = value.slice(0, -1)
-    }
-    if (value) return value;
+    if (value) return wrapURL(value);
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_URL;
     }
@@ -72,7 +76,7 @@ export function remoteIsValid() {
 
 export function getGitProxy() {
     const value = getMyArgument("git_proxy");
-    if (value) return value;
+    if (value) return wrapURL(value);
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_PROXY;
     }
@@ -113,7 +117,7 @@ export function getBootstrapFull() {
 
 export function getAssetServer() {
     const value = getMyArgument("git_asset_server");
-    if (value) return value;
+    if (value) return wrapURL(value);
     if (process.env.NODE_ENV === 'development') {
         return process.env.RISU_GIT_ASSET_SERVER;
     }

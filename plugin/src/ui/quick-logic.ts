@@ -3,7 +3,7 @@ import {applyClickHandlerWithSpinner, disableButtonIfRemoteIsInvalid} from "./lo
 import {pushRepository, saveCharacterAndCommit, saveDatabaseAndCommit} from "../lib/git";
 import overlayTemplate from './panel.html';
 
-export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivElement) {
+export function quickLogic(overlay: BaseOverlay, container: HTMLDivElement) {
     const closeButton = container.querySelector<HTMLButtonElement>('#rg-quick-close-button');
     const allButton = container.querySelector<HTMLButtonElement>('#rg-quick-all-button');
     const characterButton = container.querySelector<HTMLButtonElement>('#rg-quick-character-button');
@@ -92,7 +92,7 @@ export function initializeOverlayLogic(overlay: BaseOverlay, container: HTMLDivE
 
     overlayButton.addEventListener('click', async () => {
         const overlay = new BaseOverlay()
-        await overlay.show(overlayTemplate, "panel")
+        await overlay.show(overlayTemplate, quickLogic)
     })
 
     return undefined;

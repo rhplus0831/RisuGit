@@ -11,15 +11,27 @@ export interface SlicedChat {
     message: SlicedMessage[]
 }
 
+export type AssetData = [localName: string, filePath: string, fileType: string];
+export type EmotionData = [emotionName: string, filePath: string]
+
 export interface SlicedCharacter {
     chaId: string
     chats: SlicedChat[],
     name: string,
-    chatPage: number
+    chatPage: number,
+    additionalAssets: AssetData[] | undefined,
+    image: string,
+    emotionImages: EmotionData[] | undefined,
+    ccAssets: AssetData[] | undefined,
+    lastInteraction: number
 }
 
 export interface IndexedCharacter extends SlicedCharacter {
     index: number
+}
+
+export interface SlicedModule {
+    assets: AssetData[] | undefined
 }
 
 /**
@@ -30,29 +42,37 @@ export interface SlicedDatabase {
     characterOrder: any[];
     loreBook: any[];
     personas: any[];
-    modules: any[];
+    modules: SlicedModule[];
     statics: any;
     statistics: any;
     botPresets: any[];
+    customBackground: string
+    userIcon: string
 }
 
-export interface OpenAIChat{
-    role: 'system'|'user'|'assistant'|'function'
+export interface OpenAIChat {
+    role: 'system' | 'user' | 'assistant' | 'function'
     content: string
-    memo?:string
-    name?:string
-    removable?:boolean
-    attr?:string[]
+    memo?: string
+    name?: string
+    removable?: boolean
+    attr?: string[]
     multimodals?: MultiModal[]
     thoughts?: string[]
     cachePoint?: boolean
 }
 
-export interface MultiModal{
-    type:'image'|'video'|'audio'
-    base64:string,
-    height?:number,
-    width?:number
+export interface MultiModal {
+    type: 'image' | 'video' | 'audio'
+    base64: string,
+    height?: number,
+    width?: number
+}
+
+export interface SlicedStorage {
+    getItem(key: string): Promise<Buffer>;
+    setItem(key: string, value: any): Promise<Buffer>;
+    isAccount: boolean;
 }
 
 type ReplacerFunction = (content: OpenAIChat[], type: string) => OpenAIChat[] | Promise<OpenAIChat[]>

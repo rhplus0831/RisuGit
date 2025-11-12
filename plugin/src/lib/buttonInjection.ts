@@ -3,6 +3,8 @@ import overlayTemplate from '../ui/panel.html';
 import chatTemplate from '../ui/quick.html';
 // @ts-ignore
 import tailwindStyles from '../../dist/main.css';
+import {panelLogic} from "../ui/panel-logic";
+import {quickLogic} from "../ui/quick-logic";
 // 주입된 스타일이 중복되지 않도록 한 번만 실행
 (function () {
     let style: HTMLStyleElement | null = document.getElementById('risu-git-styles') as HTMLStyleElement;
@@ -68,7 +70,7 @@ async function getSetting() {
         }
     }
     button.onclick = () => {
-        settingOverlay.show(overlayTemplate, 'panel');
+        settingOverlay.show(overlayTemplate, panelLogic);
     }
 }
 
@@ -107,7 +109,7 @@ async function getToolbar() {
         }
     }
     button.onclick = () => {
-        chatOverlay.show(chatTemplate, 'quick');
+        chatOverlay.show(chatTemplate, quickLogic);
     }
 }
 

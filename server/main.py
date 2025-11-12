@@ -55,6 +55,12 @@ async def upload_file(
     if file.size > settings.MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File is too large")
 
+    hash_from_name = filename.split("/")[-1].split(".")[0]
+    hash_from_file = await get_file_hash(file)
+
+    if hash_from_file != hash_from_name:
+        raise HTTPException(status_code=400, detail=f"File is corrupt? Excepted: {hash_from_name}, Actual: {hash_from_file}")
+
     await storage.save(file, filename)
 
     asset = session.exec(select(Asset).where(Asset.filename == filename)).first()

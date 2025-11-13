@@ -1,13 +1,10 @@
 import {BaseOverlay} from "./baseOverlay";
 import {pullAssetFromServer, pushAssetsToServer} from "../lib/asset";
+import {wrapConfirm, wrapProgress} from "./progress-logic";
 
 export function assetPullLogic(overlay: BaseOverlay, container: HTMLDivElement) {
-    const progress = container.querySelector<HTMLSpanElement>('#rg-progress');
-    if(!progress) return undefined;
-    pullAssetFromServer(async (message) => {
-        progress.innerText = message
-    }).then(() => {
-        overlay.close();
+    pullAssetFromServer(wrapProgress(overlay, container)).then((message) => {
+        wrapConfirm(overlay, container, message)
     })
 
     return undefined;

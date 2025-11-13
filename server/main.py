@@ -27,8 +27,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origin_regex=r".*",
     allow_methods=["GET", "HEAD", "PUT", "OPTIONS"],
     allow_headers=["*"],
     max_age=86400,
@@ -37,7 +36,7 @@ app.add_middleware(
 
 @app.middleware("http")
 async def check_risu_git_flag(request: Request, call_next):
-    if request.method.lower() != "options" and "x-risu-git-flag" not in request.headers:
+    if (request.method.lower() != "options" and request.method.lower() != "head") and "x-risu-git-flag" not in request.headers:
         return Response(status_code=400)
     response = await call_next(request)
     return response

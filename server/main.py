@@ -15,6 +15,9 @@ from utils import get_file_hash
 # { "filename": "last_access_attempt_time" }
 get_request_cache = {}
 
+# In-memory cache for checking exist
+exist_cache = {}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,7 +35,6 @@ app.add_middleware(
     allow_headers=["*"],
     max_age=86400,
 )
-
 
 @app.middleware("http")
 async def check_risu_git_flag(request: Request, call_next):
@@ -80,6 +82,8 @@ async def upload_file(
     session.add(asset)
     session.commit()
     session.refresh(asset)
+
+    exist_cache[filename] = True
 
     return {"status": "ok"}
 
@@ -133,14 +137,17 @@ async def head_file(
     if '/' in filename:
         raise HTTPException(status_code=400, detail="Path is contains a slash")
 
+    cache_headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+
+    if filename in exist_cache:
+        return Response(status_code=200, headers=cache_headers)
+
     asset = session.exec(select(Asset).where(Asset.filename == filename)).first()
     if not asset:
         return Response(status_code=404)
 
     cache_headers = {"Cache-Control": "public, max-age=31536000, immutable"}
-
-    # if not await storage.exists(filename):
-    #     return Response(status_code=404)
+    exist_cache[filename] = True
 
     return Response(status_code=200, headers=cache_headers)
 

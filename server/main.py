@@ -29,8 +29,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "HEAD", "PUT", "OPTIONS"],
     allow_headers=["*"],
+    max_age=86400,
 )
 
 
@@ -60,7 +61,8 @@ async def upload_file(
     hash_from_file = await get_file_hash(file_bytes)
 
     if hash_from_file != hash_from_name:
-        raise HTTPException(status_code=400, detail=f"File is corrupt? Excepted: {hash_from_name}, Actual: {hash_from_file}")
+        raise HTTPException(status_code=400,
+                            detail=f"File is corrupt? Excepted: {hash_from_name}, Actual: {hash_from_file}")
 
     await storage.save(file_bytes, filename)
 

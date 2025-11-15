@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build:css": "tailwindcss -i src/input.css -o dist/main.css --minify",
-    "build:js": "esbuild src/index.ts --bundle --platform=browser --target=es2022 --format=iife --minify --legal-comments=none --loader:.html=text --loader:.css=text --outfile=dist/index.js --define:process.env.NODE_ENV='\"production\"'",
+    "build:js": "esbuild src/index.ts --bundle --platform=browser --target=es2022 --format=iife --minify --legal-comments=none --loader:.html=text --loader:.css=text --outfile=dist/dist.js --define:process.env.NODE_ENV='\"production\"'",
     "build": "npm run build:css && npm run build:js",
     "postbuild": "tsx scripts/add-headers.ts",
     "watch": "tsx scripts/watch.ts"

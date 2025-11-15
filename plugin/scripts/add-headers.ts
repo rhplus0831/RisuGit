@@ -5,7 +5,7 @@ function main() {
     const filePath = path.join(__dirname, "..", "dist", "index.js")
     const content = fs.readFileSync(filePath, 'utf-8');
     const header = `//@name RisuGit
-//@display-name RisuGit
+//@display-name RisuGit (rev 20251115)
 //@arg encrypt_key string
 //@arg git_proxy string
 //@arg git_url string

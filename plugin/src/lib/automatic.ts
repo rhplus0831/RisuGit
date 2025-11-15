@@ -1,4 +1,4 @@
-import {getBootstrap, getAutoPush, getAutoSave, remoteIsValid, getBootstrapFull} from "./configure";
+import {getBootstrapPull, getAutomaticPush, getOnRequestSaveChat, remoteIsValid, getBootstrapSavePushCharacter} from "./configure";
 import {pullRepository, pushRepository, saveCharacterAndCommit, saveDatabaseAndCommit} from "./git";
 import {SlicedChat} from "./risu";
 
@@ -50,7 +50,7 @@ function hideGitIndicator(): void {
 }
 
 (async function () {
-    if(!getBootstrap()) return;
+    if(!getBootstrapPull()) return;
     try {
         const indicator = showOrUpdateGitIndicator("초기화...")
         if (remoteIsValid()) {
@@ -58,7 +58,7 @@ function hideGitIndicator(): void {
             await pullRepository()
         }
 
-        if(!getBootstrapFull()) return;
+        if(!getBootstrapSavePushCharacter()) return;
 
         await saveDatabaseAndCommit("자동 저장", async (message) => {
             showOrUpdateGitIndicator('자동 저장: ' + message, indicator)
@@ -76,7 +76,7 @@ function hideGitIndicator(): void {
 })();
 
 async function onAllRequestsFinished() {
-    if (!getAutoSave()) return;
+    if (!getOnRequestSaveChat()) return;
     showOrUpdateGitIndicator()
     const char = getChar()
     const currentChat: SlicedChat = char.chats[char.chatPage]
@@ -92,7 +92,7 @@ async function onAllRequestsFinished() {
         hideGitIndicator()
     }
 
-    if (!getAutoPush()) return;
+    if (!getAutomaticPush()) return;
 
     try {
         await pushRepository()

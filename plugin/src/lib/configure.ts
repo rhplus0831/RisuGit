@@ -17,6 +17,12 @@ function getMyArgument(name: string) {
     return globalThis.__pluginApis__.getArg(`RisuGit::${name}`)
 }
 
+// @ts-ignore
+function setMyArgument(name: string, value: string) {
+    // @ts-ignore
+    return globalThis.__pluginApis__.setArg(`RisuGit::${name}`, value)
+}
+
 export function getBoolean(name: string, defaultValue: boolean) {
     const value = getMyArgument(name);
     // 값이 비어있으면 true
@@ -27,6 +33,10 @@ export function getBoolean(name: string, defaultValue: boolean) {
     return value == 1 || value == "1" || value.toString().toLowerCase() == "true";
 }
 
+export function setBoolean(name: string, value: boolean) {
+    setMyArgument(name, value ? 'true' : 'false')
+}
+
 export function getEncryptPassword() {
     const value = getMyArgument("encrypt_key");
     if (value) return value;
@@ -34,6 +44,10 @@ export function getEncryptPassword() {
         return process.env.RISU_ENCRYPT_KEY;
     }
     return "";
+}
+
+export function setEncryptPassword(value: string) {
+    setMyArgument("encrypt_key", value)
 }
 
 function wrapURL(url: string): string {
@@ -52,6 +66,10 @@ export function getGitURL() {
     return ""
 }
 
+export function setGitURL(value: string) {
+    setMyArgument("git_url", value);
+}
+
 export function getGitId() {
     const value = getMyArgument("git_id");
     if (value) return value;
@@ -61,6 +79,10 @@ export function getGitId() {
     return "";
 }
 
+export function setGitId(value: string) {
+    setMyArgument("git_id", value)
+}
+
 export function getGitPassword() {
     const value = getMyArgument("git_password");
     if (value) return value;
@@ -68,6 +90,10 @@ export function getGitPassword() {
         return process.env.RISU_GIT_PASSWORD;
     }
     return "";
+}
+
+export function setGitPassword(value: string) {
+    return setMyArgument("git_password", value)
 }
 
 export function remoteIsValid() {
@@ -83,12 +109,20 @@ export function getGitProxy() {
     return "https://cors.isomorphic-git.org";
 }
 
+export function setGitProxy(value: string) {
+    setMyArgument("git_proxy", value)
+}
+
 export function getBranch() {
     let branch = getMyArgument("git_branch");
     if (!branch) {
         branch = "main";
     }
     return branch;
+}
+
+export function setBranch(value: string) {
+    setMyArgument("git_branch", value)
 }
 
 export function getClientName() {
@@ -99,20 +133,56 @@ export function getClientName() {
     return name;
 }
 
-export function getAutoSave() {
-    return getBoolean("git_autosave", process.env.NODE_ENV === 'development');
+export function setClientName(value: string) {
+    setMyArgument("git_client_name", value)
 }
 
-export function getAutoPush() {
-    return getBoolean("git_autopush", process.env.NODE_ENV === 'development');
+export function getOnRequestSaveChat() {
+    return getBoolean("git_on_request_save_chat", process.env.NODE_ENV === 'development');
 }
 
-export function getBootstrap() {
-    return getBoolean("git_bootstrap", process.env.NODE_ENV === 'development')
+export function setOnRequestSaveChat(value: boolean) {
+    setBoolean("git_on_request_save_chat", value)
 }
 
-export function getBootstrapFull() {
-    return getBoolean("git_bootstrap_full", false)
+export function getAutomaticPush() {
+    return getBoolean("git_automatic_push", process.env.NODE_ENV === 'development');
+}
+
+export function setAutomaticPush(value: boolean) {
+    setBoolean("git_automatic_push", value)
+}
+
+export function getBootstrapPull() {
+    return getBoolean("git_bootstrap_pull", process.env.NODE_ENV === 'development')
+}
+
+export function setBootstrapPull(value: boolean) {
+    setBoolean("git_bootstrap_pull", value)
+}
+
+export function getBootstrapSavePushCharacter() {
+    return getBoolean("git_bootstrap_save_push_character", false)
+}
+
+export function setBootstrapSavePushCharacter(value: boolean) {
+    setBoolean("git_bootstrap_save_push_other", value)
+}
+
+export function getBootstrapSavePushOther() {
+    return getBoolean("git_bootstrap_save_push_other", false)
+}
+
+export function setBootstrapSavePushOther(value: boolean) {
+    setBoolean("git_bootstrap_save_push_other", value)
+}
+
+export function getBootstrapPushAsset() {
+    return getBoolean("git_bootstrap_push_asset", false)
+}
+
+export function setBootstrapPushAsset(value: boolean) {
+    setBoolean("git_bootstrap_push_asset", value)
 }
 
 export function getAssetServer() {
@@ -122,4 +192,8 @@ export function getAssetServer() {
         return process.env.RISU_GIT_ASSET_SERVER;
     }
     return "";
+}
+
+export function setAssetServer(value: string) {
+    setMyArgument("git_asset_server", value)
 }

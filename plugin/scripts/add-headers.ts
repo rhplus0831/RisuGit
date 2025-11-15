@@ -7,16 +7,19 @@ function main() {
     const header = `//@name RisuGit
 //@display-name RisuGit
 //@arg encrypt_key string
+//@arg git_proxy string
 //@arg git_url string
 //@arg git_id string
 //@arg git_password string
-//@arg git_proxy string
 //@arg git_branch string
 //@arg git_client_name string
-//@arg git_autosave string
-//@arg git_autopush string
-//@arg git_bootstrap string
-//@arg git_bootstrap_full string
+//@arg git_on_request_save_chat string
+//@arg git_setting_close_save_other string
+//@arg git_automatic_push string
+//@arg git_bootstrap_pull string
+//@arg git_bootstrap_save_push_character string
+//@arg git_bootstrap_save_push_other string
+//@arg git_bootstrap_push_asset string
 //@arg git_asset_server string
 
 `

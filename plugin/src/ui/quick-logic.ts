@@ -1,7 +1,9 @@
 import {BaseOverlay} from "./baseOverlay";
-import {applyClickHandlerWithSpinner, disableButtonIfRemoteIsInvalid} from "./loadingButton";
 import {pushRepository, saveCharacterAndCommit, saveDatabaseAndCommit} from "../lib/git";
 import overlayTemplate from './panel.html';
+import {popMessage, popProgress} from "./modal-logic";
+
+import {disableButtonIfRemoteIsInvalid} from "../lib/utils";
 
 export function quickLogic(overlay: BaseOverlay, container: HTMLDivElement) {
     const closeButton = container.querySelector<HTMLButtonElement>('#rg-quick-close-button');
@@ -34,61 +36,72 @@ export function quickLogic(overlay: BaseOverlay, container: HTMLDivElement) {
     characterNameSpan.innerText = char.name
     chatNameSpan.innerText = char.chats[char.chatPage].name
 
-    const buttons = [closeButton, allButton, characterButton, chatButton, pushButton, overlayButton]
-
-    applyClickHandlerWithSpinner(allButton, buttons, async (setMessage) => {
+    allButton.onclick = async () => {
+        const message = prompt('(전체 저장) 커밋 메시지를 정하세요', '세이브 데이터');
+        if (!message) return;
+        const progress = await popProgress()
         try {
-            const message = prompt('(전체 저장) 커밋 메시지를 정하세요', '세이브 데이터');
-            if (!message) return;
-            const isChanged = await saveDatabaseAndCommit(message, setMessage);
+            const isChanged = await saveDatabaseAndCommit(message, progress.callback);
+            progress.overlay.close()
             if (!isChanged) {
-                alert('변경 사항이 없습니다!')
+                await popMessage('변경 사항이 없습니다!')
             } else {
-                alert(`저장되었습니다: ${isChanged}`)
+                await popMessage(`저장되었습니다: ${isChanged}`)
             }
         } catch (reason) {
-            alert(`저장에 실패했습니다: ${reason}`)
+            progress.overlay.close()
+            await popMessage(`저장에 실패했습니다: ${reason}`)
         }
-    })
+    }
 
-    applyClickHandlerWithSpinner(characterButton, buttons, async (setMessage) => {
+    characterButton.onclick = async () => {
+        const message = prompt('(캐릭터 저장) 커밋 메시지를 정하세요', '세이브 데이터');
+        if (!message) return;
+        const progress = await popProgress()
         try {
-            const message = prompt('(캐릭터 저장) 커밋 메시지를 정하세요', '세이브 데이터');
-            if (!message) return;
-            const isChanged = await saveCharacterAndCommit(message, char.chaId, undefined, setMessage);
+            const isChanged = await saveCharacterAndCommit(message, char.chaId, undefined, progress.callback);
+            progress.overlay.close()
             if (!isChanged) {
-                alert('변경 사항이 없습니다!')
+                await popMessage('변경 사항이 없습니다!')
             } else {
-                alert(`저장되었습니다: ${isChanged}`)
+                await popMessage(`저장되었습니다: ${isChanged}`)
             }
         } catch (reason) {
-            alert(`저장에 실패했습니다: ${reason}`)
+            progress.overlay.close()
+            await popMessage(`저장에 실패했습니다: ${reason}`)
         }
-    })
+    }
 
-    applyClickHandlerWithSpinner(chatButton, buttons, async (setMessage) => {
+    chatButton.onclick = async () => {
+        const message = prompt('(채팅 저장) 커밋 메시지를 정하세요', '세이브 데이터');
+        if (!message) return;
+        const progress = await popProgress()
         try {
-            const message = prompt('(채팅 저장) 커밋 메시지를 정하세요', '세이브 데이터');
-            if (!message) return;
-            const isChanged = await saveCharacterAndCommit(message, char.chaId, char.chats[char.chatPage].id, setMessage);
+            const isChanged = await saveCharacterAndCommit(message, char.chaId, char.chats[char.chatPage].id, progress.callback);
+            progress.overlay.close()
             if (!isChanged) {
-                alert('변경 사항이 없습니다!')
+                await popMessage('변경 사항이 없습니다!')
             } else {
-                alert(`저장되었습니다: ${isChanged}`)
+                await popMessage(`저장되었습니다: ${isChanged}`)
             }
         } catch (reason) {
-            alert(`저장에 실패했습니다: ${reason}`)
+            progress.overlay.close()
+            await popMessage(`저장에 실패했습니다: ${reason}`)
         }
-    })
+    }
 
-    applyClickHandlerWithSpinner(pushButton, buttons, async (setMessage) => {
+    pushButton.onclick = async () => {
+        const progress = await popProgress()
+        await progress.callback('저장소에 올리는 중입니다...')
         try {
             await pushRepository()
-            alert('푸시되었습니다.')
+            progress.overlay.close()
+            await popMessage('푸시되었습니다.')
         } catch (reason) {
-            alert(`업로드에 실패했습니다, 설정창에서 다시 시도해주세요: ${reason}`)
+            progress.overlay.close()
+            await popMessage(`업로드에 실패했습니다, 설정창에서 다시 시도해주세요: ${reason}`)
         }
-    })
+    }
 
     overlayButton.addEventListener('click', async () => {
         const overlay = new BaseOverlay()

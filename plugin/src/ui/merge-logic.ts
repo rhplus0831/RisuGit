@@ -1,6 +1,6 @@
 import {BaseOverlay} from "./baseOverlay";
 import {pushRepository, mergeCommit} from "../lib/git";
-import {applyClickHandlerWithSpinner} from "./loadingButton";
+import {popMessage, popProgress} from "./modal-logic";
 
 export function mergeLogic(overlay: BaseOverlay, container: HTMLDivElement) {
     const closeButton = container.querySelector<HTMLButtonElement>('#rg-merge-close-button');
@@ -17,26 +17,34 @@ export function mergeLogic(overlay: BaseOverlay, container: HTMLDivElement) {
         return undefined;
     }
 
-    applyClickHandlerWithSpinner(localMergeButton, [localMergeButton, remoteMergeButton], async () => {
+    localMergeButton.onclick = async () => {
+        const progress = await popProgress()
         try {
+            await progress.callback('로컬기준으로 병합하는중...')
             await mergeCommit('Merge changes from local', true);
+            await pushRepository()
+            progress.overlay.close()
+            overlay.close();
+        } catch (e: any) {
+            console.error("Merge commit failed:", e);
+            progress.overlay.close()
+            await popMessage(`병합에 실패했습니다: ${e.message}`);
+        }
+    }
+
+    remoteMergeButton.onclick = async () => {
+        const progress = await popProgress()
+        try {
+            await progress.callback('서버기준으로 병합하는중...')
+            await mergeCommit('Merge changes from local', false);
             await pushRepository()
             overlay.close();
         } catch (e: any) {
             console.error("Merge commit failed:", e);
-            alert(`병합에 실패했습니다: ${e.message}`);
+            progress.overlay.close()
+            await popMessage(`병합에 실패했습니다: ${e.message}`);
         }
-    });
-
-    applyClickHandlerWithSpinner(remoteMergeButton, [localMergeButton, remoteMergeButton], async () => {
-        try {
-            await mergeCommit('Merge changes from remote', false);
-            overlay.close();
-        } catch (e: any) {
-            console.error("Merge commit failed:", e);
-            alert(`병합에 실패했습니다: ${e.message}`);
-        }
-    });
+    }
 
     // 정리 함수 반환
     return () => {

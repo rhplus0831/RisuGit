@@ -10,11 +10,13 @@ import {
     saveDatabaseAndCommit
 } from "../lib/git";
 import mergeTemplate from './merge.html';
-import progressTemplate from './progress.html';
-import {applyClickHandlerWithSpinner, disableButtonIfRemoteIsInvalid} from "./loadingButton";
+import modalTemplate from './modal.html';
 import {mergeLogic} from "./merge-logic";
 import {assetPushLogic} from "./asset-push-logic";
 import {assetPullLogic} from "./asset-pull-logic";
+import {popConfirm, popMessage, popProgress, wrapConfirm, wrapProgress} from "./modal-logic";
+
+import {disableButtonIfAssetServerIsInvalid, disableButtonIfRemoteIsInvalid} from "../lib/utils";
 
 export function panelLogic(overlay: BaseOverlay, container: HTMLDivElement) {
     const closeButton = container.querySelector<HTMLButtonElement>('#rg-close-button');
@@ -28,23 +30,11 @@ export function panelLogic(overlay: BaseOverlay, container: HTMLDivElement) {
     const assetPushButton = container.querySelector<HTMLButtonElement>("#rg-push-asset")
     const assetPullButton = container.querySelector<HTMLButtonElement>("#rg-pull-asset")
 
-    let buttons: HTMLButtonElement[] = []
-
     // 타입 체크... 귀찮다...
-    if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton || !revertButton || !assetPushButton) {
+    if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton || !revertButton || !assetPushButton || !assetPullButton) {
         console.log("버튼... 없다?")
         return;
     }
-
-    function resetButtons() {
-        if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton || !revertButton || !assetPushButton) {
-            console.log("버튼... 없다?")
-            return;
-        }
-        buttons = [closeButton, persistButton, commitButton, pushButton, pullButton, trimButton, revertButton, deleteButton, assetPushButton]
-    }
-
-    resetButtons()
 
     closeButton.addEventListener('click', () => {
         overlay.close()
@@ -53,6 +43,9 @@ export function panelLogic(overlay: BaseOverlay, container: HTMLDivElement) {
     disableButtonIfRemoteIsInvalid(pushButton);
     disableButtonIfRemoteIsInvalid(pullButton);
     disableButtonIfRemoteIsInvalid(trimButton);
+
+    disableButtonIfAssetServerIsInvalid(assetPushButton)
+    disableButtonIfAssetServerIsInvalid(assetPullButton)
 
     async function checkPersist() {
         if (persistButton) {
@@ -110,12 +103,6 @@ export function panelLogic(overlay: BaseOverlay, container: HTMLDivElement) {
         // 기존 데이터가 있으면 제거
         historyContainer.innerHTML = ''
 
-        if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton) {
-            console.log("버튼... 없다?")
-            return;
-        }
-
-        resetButtons()
 
         if (history.length == 0) {
             historyContainer.innerHTML = '커밋이 아직 없습니다.'
@@ -139,45 +126,53 @@ export function panelLogic(overlay: BaseOverlay, container: HTMLDivElement) {
 
             const revertButton = cloned.querySelector<HTMLButtonElement>("#rg-history-revert-button")
             if (revertButton) {
-                applyClickHandlerWithSpinner(revertButton, buttons, async (setMessage) => {
+                revertButton.onclick = () => {
                     const commitId = commit.oid;
                     const shortCommitId = commitId.slice(0, 7);
-                    if (confirm(`정말로 이 커밋(${shortCommitId})의 내용을 리스에 적용하시겠습니까?\n만약의 사태를 위해, 일반 백업을 해두는것을 권장합니다.`)) {
+                    popConfirm(`정말로 이 커밋(${shortCommitId})의 내용을 리스에 적용하시겠습니까?\n만약의 사태를 위해, 일반 백업을 해두는것을 권장합니다.`, async () => {
                         try {
-                            await revertDatabaseToCommit(commitId, setMessage);
-                            alert("완료되었습니다, 새로고침을 권장합니다.")
-                        } catch (reason) {
-                            alert(reason)
+                            const progress = await popProgress()
+                            await revertDatabaseToCommit(commitId, progress.callback);
+                            progress.overlay.close()
+                            await popMessage("완료되었습니다, 새로고침을 권장합니다.")
+                        } catch (reason: any) {
+                            await popMessage(reason.toString())
                         }
-                    }
-                })
-                buttons.push(revertButton)
+                    }, undefined)
+                }
             }
             historyContainer.appendChild(cloned)
         })
     }
 
-    applyClickHandlerWithSpinner(commitButton, buttons, async (setMessage) => {
+    commitButton.onclick = async () => {
+        const message = prompt('커밋 메시지를 정하세요', '세이브 데이터');
+        if (!message) return;
+        const progress = await popProgress()
         try {
-            const message = prompt('커밋 메시지를 정하세요', '세이브 데이터');
-            if (!message) return;
-            const isChanged = await saveDatabaseAndCommit(message, setMessage);
+            const isChanged = await saveDatabaseAndCommit(message, progress.callback);
+            progress.overlay.close()
             if (!isChanged) {
-                alert('변경 사항이 없습니다!')
+                await popMessage('변경 사항이 없습니다!')
             } else {
                 await refreshCommitHistory()
-                alert(`저장되었습니다: ${isChanged}`)
+                await popMessage(`저장되었습니다: ${isChanged}`)
             }
         } catch (reason) {
-            alert(`저장에 실패했습니다: ${reason}`)
+            progress.overlay.close()
+            await popMessage(`저장에 실패했습니다: ${reason}`)
         }
-    })
+    }
 
-    applyClickHandlerWithSpinner(pushButton, buttons, async () => {
+    pushButton.onclick = async () => {
+        const progress = await popProgress();
+        await progress.callback("서버에 올리고 있습니다...")
         try {
             await pushRepository();
-            alert('서버에 올라갔습니다')
+            progress.overlay.close()
+            await popMessage('서버에 올라갔습니다')
         } catch (reason: any) {
+            progress.overlay.close()
             if (reason.hasOwnProperty('code') && reason.code === 'PushRejectedError') {
                 const mergeOverlay = new BaseOverlay()
                 mergeOverlay.extraCleanup = () => {
@@ -185,73 +180,92 @@ export function panelLogic(overlay: BaseOverlay, container: HTMLDivElement) {
                 }
                 mergeOverlay.show(mergeTemplate, mergeLogic).then()
             } else {
-                alert(`서버에 올리는데 실패했습니다: ${reason}`)
+                await popMessage(`서버에 올리는데 실패했습니다: ${reason}`)
             }
         }
-    })
-
-    applyClickHandlerWithSpinner(pullButton, buttons, async () => {
-        try {
-            await pullRepository();
-            await refreshCommitHistory();
-            alert('서버에서 데이터를 받아왔습니다')
-        } catch (reason: any) {
-            if (reason.hasOwnProperty('code') && reason.code === 'MergeConflictError') {
-                alert('서버와 데이터 충돌이 있어서 데이터를 받아올 수 없었습니다. 서버로 보내기를 통해 데이터 충돌을 해결하세요')
-            } else {
-                alert(`서버에서 받는데 실패했습니다: ${reason}`)
-            }
-        }
-    })
-
-    applyClickHandlerWithSpinner(revertButton, buttons, async (setMessage) => {
-        try {
-            if (confirm('특정 커밋을 로컬에서, 없는경우 서버에서 받아와 복원을 시도합니다, 계속할까요?')) {
-                const sha = prompt("커밋 ID(sha)를 입력해주세요")
-                if (!sha) {
-                    return;
-                }
-                await revertDatabaseToCommit(sha, setMessage)
-                await refreshCommitHistory();
-                alert("완료되었습니다, 새로고침을 권장합니다.")
-            }
-        } catch (reason: any) {
-            alert(reason)
-        }
-    })
-
-    applyClickHandlerWithSpinner(trimButton, buttons, async () => {
-        try {
-            if (confirm('현재 기기에 있는 깃 저장소를 있는경우 제거한 뒤, 서버에서 최근 커밋 한개만을 받아오는것으로 이전 기록을 지웁니다.\n데이터의 소모가 있을 수 있습니다, 계속 진행할까요?')) {
-                await recloneRepoWithLowDepth();
-                await refreshCommitHistory()
-            }
-        } catch (reason: any) {
-            alert(reason)
-        }
-    })
-
-    applyClickHandlerWithSpinner(deleteButton, buttons, async () => {
-        try {
-            if (confirm('현재 기기에 있는 깃 저장소를 삭제합니다, 서버에 올리지 않은 모든 변경사항은 유실됩니다.')) {
-                await deleteRepo()
-                overlay.close()
-            }
-        } catch (reason: any) {
-            alert(reason)
-        }
-    })
-
-    assetPushButton.onclick = () => {
-        const overlay = new BaseOverlay();
-        overlay.show(progressTemplate, assetPushLogic)
     }
 
-    if (assetPullButton) {
-        assetPullButton.onclick = () => {
-            const overlay = new BaseOverlay();
-            overlay.show(progressTemplate, assetPullLogic)
+    pullButton.onclick = async () => {
+        const progress = await popProgress();
+        await progress.callback("서버에서 받아고오 있습니다...")
+        try {
+            await pullRepository();
+            progress.overlay.close()
+            await refreshCommitHistory();
+        } catch (reason: any) {
+            progress.overlay.close()
+            if (reason.hasOwnProperty('code') && reason.code === 'MergeConflictError') {
+                await popMessage('서버와 데이터 충돌이 있어서 데이터를 받아올 수 없었습니다. 서버로 보내기를 통해 데이터 충돌을 해결하세요')
+            } else {
+                await popMessage(`서버에서 받는데 실패했습니다: ${reason}`)
+            }
         }
+    }
+
+    revertButton.onclick = async () => {
+        await popConfirm('특정 커밋을 로컬에서, 없는경우 서버에서 받아와 복원을 시도합니다, 계속할까요?', async () => {
+            const sha = prompt("커밋 ID(sha)를 입력해주세요")
+            if (!sha) {
+                return;
+            }
+            await overlay.show(modalTemplate, async (overlay, element) => {
+                const setMessage = await popProgress()
+                try {
+                    await revertDatabaseToCommit(sha, setMessage.callback)
+                    await refreshCommitHistory();
+                    setMessage.overlay.close()
+                    await popMessage("완료되었습니다, 새로고침을 권장합니다.")
+                } catch (reason: any) {
+                    overlay.close()
+                    setMessage.overlay.close()
+                    await popMessage(reason)
+                }
+            })
+        }, undefined)
+    }
+
+    trimButton.onclick = async () => {
+        await popConfirm('현재 기기에 있는 깃 저장소를 있는경우 제거한 뒤, 서버에서 최근 커밋 한개만을 받아오는것으로 이전 기록을 지웁니다.\n서버에 푸시되지 않은 내용이 제거되고, 저장소의 용량만큼 데이터가 전송됩니다. 계속하시겠습니까?', async () => {
+            const progress = await popProgress();
+            try {
+                await progress.callback('저장소를 다시 가져오는중...')
+                await recloneRepoWithLowDepth();
+                await refreshCommitHistory()
+                progress.overlay.close()
+            } catch (reason: any) {
+                progress.overlay.close()
+                await popMessage(reason)
+            }
+        }, undefined)
+    }
+
+    deleteButton.onclick = async () => {
+        await popConfirm('현재 기기에 있는 깃 저장소를 삭제합니다, 서버에 올리지 않은 모든 변경사항은 유실됩니다.', async () => {
+            const progress = await popProgress();
+            try {
+                await progress.callback('저장소 삭제중...')
+                await deleteRepo()
+                progress.overlay.close()
+                await refreshCommitHistory()
+            } catch (reason: any) {
+                progress.overlay.close()
+                await popMessage(reason)
+            }
+        }, undefined)
+    }
+
+    assetPushButton.onclick = async () => {
+        await popConfirm('모든 에셋을 서버에 올립니다. 서버에 존재하지 않는 에셋이 올라갑니다.\n이전 호출 기록이 남아있는 경우, 그 정보가 캐싱됩니다.', async () => {
+            const overlay = new BaseOverlay();
+            await overlay.show(modalTemplate, assetPushLogic)
+        }, undefined)
+    }
+
+    assetPullButton.onclick = async () => {
+        await popConfirm('서버에서 에셋을 받아옵니다. 로컬에 데이터가 없는 에셋만 다운로드 됩니다.', async () => {
+            const overlay = new BaseOverlay();
+            await overlay.show(modalTemplate, assetPullLogic)
+        }, undefined)
     }
 
     refreshCommitHistory().then()

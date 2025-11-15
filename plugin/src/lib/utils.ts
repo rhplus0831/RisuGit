@@ -1,4 +1,4 @@
-import {getAssetServer} from "./configure";
+import {getAssetServer, remoteIsValid} from "./configure";
 
 const retryDelays = [1000, 2000, 4000, 8000];
 const maxRetries = retryDelays.length;
@@ -37,4 +37,20 @@ export async function retryFetch(url: string | URL | Request, request: RequestIn
         }
     }
     throw new Error("Reached retry limit")
+}
+
+export function disableButtonIfRemoteIsInvalid(button: HTMLButtonElement) {
+    if (!remoteIsValid()) {
+        button.classList.add('rg-opacity-50', 'rg-cursor-not-allowed', 'flag-disabled')
+        button.disabled = true;
+        button.innerHTML += ' (원격 설정 필요)'
+    }
+}
+
+export function disableButtonIfAssetServerIsInvalid(button: HTMLButtonElement) {
+    if (!getAssetServer().trim()) {
+        button.classList.add('rg-opacity-50', 'rg-cursor-not-allowed', 'flag-disabled')
+        button.disabled = true;
+        button.innerHTML += ' (에셋 서버 필요)'
+    }
 }

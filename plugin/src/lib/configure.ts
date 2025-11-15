@@ -137,12 +137,24 @@ export function setClientName(value: string) {
     setMyArgument("git_client_name", value)
 }
 
+//
+// 오토메틱 푸시
+//
+
 export function getOnRequestSaveChat() {
     return getBoolean("git_on_request_save_chat", process.env.NODE_ENV === 'development');
 }
 
 export function setOnRequestSaveChat(value: boolean) {
     setBoolean("git_on_request_save_chat", value)
+}
+
+export function getOnRequestSaveOther() {
+    return getBoolean("git_setting_close_save_other", process.env.NODE_ENV === 'development');
+}
+
+export function setOnRequestSaveOther(value: boolean) {
+    setBoolean("git_setting_close_save_other", value)
 }
 
 export function getAutomaticPush() {
@@ -152,6 +164,10 @@ export function getAutomaticPush() {
 export function setAutomaticPush(value: boolean) {
     setBoolean("git_automatic_push", value)
 }
+
+//
+// 부트스트랩
+//
 
 export function getBootstrapPull() {
     return getBoolean("git_bootstrap_pull", process.env.NODE_ENV === 'development')
@@ -184,6 +200,10 @@ export function getBootstrapPushAsset() {
 export function setBootstrapPushAsset(value: boolean) {
     setBoolean("git_bootstrap_push_asset", value)
 }
+
+//
+// 에셋 서버
+//
 
 export function getAssetServer() {
     const value = getMyArgument("git_asset_server");

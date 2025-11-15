@@ -68,7 +68,7 @@ export function settingLogic(overlay: BaseOverlay, container: HTMLDivElement): (
         configure.setBranch(gitBranch.value);
         configure.setClientName(gitClientName.value);
         configure.setOnRequestSaveChat(gitOnRequestSaveChat.checked);
-        configure.setBoolean("git_setting_close_save_other", gitSettingCloseSaveOther.checked);
+        configure.setOnRequestSaveOther(gitSettingCloseSaveOther.checked);
         configure.setAutomaticPush(gitAutomaticPush.checked);
         configure.setBootstrapPull(gitBootstrapPull.checked);
         configure.setBootstrapSavePushCharacter(gitBootstrapSavePushCharacter.checked);

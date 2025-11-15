@@ -71,7 +71,11 @@ export interface MultiModal {
 
 export interface SlicedStorage {
     getItem(key: string): Promise<Buffer>;
+
     setItem(key: string, value: any): Promise<Buffer>;
+
+    keys(prefix: string): Promise<string[]>
+
     isAccount: boolean;
 }
 

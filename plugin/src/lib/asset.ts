@@ -1,7 +1,5 @@
-import {getAssetServer} from "./configure";
+import {getAssetServer, getAssetServerConnectionCount} from "./configure";
 import {retryFetch} from "./utils";
-
-const concurrencyLimit = 8;
 
 function getMimeType(filename: string): string {
     const extension = filename.split('.').pop()?.toLowerCase();
@@ -138,7 +136,7 @@ export async function pushAssetsToServer(progressCallback: (message: string) => 
             }
         };
 
-        const workers = Array.from({length: concurrencyLimit}, () => worker());
+        const workers = Array.from({length: getAssetServerConnectionCount()}, () => worker());
         await Promise.all(workers);
     } finally {
         clearInterval(progressInterval);
@@ -170,6 +168,12 @@ export async function pullAssetFromServer(progressCallback: (message: string) =>
     let failedCount = 0;
     let okCount = 0;
 
+    const keys: string[] = await forageStorage.keys("")
+    let map = new Map<string, boolean>();
+    keys.forEach((value) => {
+        map.set(value, true);
+    })
+
     try {
         const queue = [...assetList];
 
@@ -178,6 +182,13 @@ export async function pullAssetFromServer(progressCallback: (message: string) =>
                 const assetPath = queue.shift();
                 if (!assetPath) {
                     break; // No more items in the queue
+                }
+
+                if (map.has(assetPath)) {
+                    console.log("Already Exist:" + assetPath)
+                    alreadyExistCount++;
+                    completedAssets++;
+                    continue;
                 }
 
                 try {
@@ -195,7 +206,7 @@ export async function pullAssetFromServer(progressCallback: (message: string) =>
             }
         };
 
-        const workers = Array.from({length: concurrencyLimit}, () => worker());
+        const workers = Array.from({length: getAssetServerConnectionCount()}, () => worker());
         await Promise.all(workers);
     } finally {
         clearInterval(progressInterval);

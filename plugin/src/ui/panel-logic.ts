@@ -29,9 +29,10 @@ export function panelLogic(overlay: BaseOverlay, container: HTMLDivElement) {
     const deleteButton = container.querySelector<HTMLButtonElement>("#rg-delete-button")
     const assetPushButton = container.querySelector<HTMLButtonElement>("#rg-push-asset")
     const assetPullButton = container.querySelector<HTMLButtonElement>("#rg-pull-asset")
+    const clearCache = container.querySelector<HTMLButtonElement>("#rg-clear-cache")
 
     // 타입 체크... 귀찮다...
-    if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton || !revertButton || !assetPushButton || !assetPullButton) {
+    if (!closeButton || !persistButton || !commitButton || !pushButton || !pullButton || !trimButton || !deleteButton || !revertButton || !assetPushButton || !assetPullButton || !clearCache) {
         console.log("버튼... 없다?")
         return;
     }
@@ -265,6 +266,17 @@ export function panelLogic(overlay: BaseOverlay, container: HTMLDivElement) {
         await popConfirm('서버에서 에셋을 받아옵니다. 로컬에 데이터가 없는 에셋만 다운로드 됩니다.', async () => {
             const overlay = new BaseOverlay();
             await overlay.show(modalTemplate, assetPullLogic)
+        }, undefined)
+    }
+
+    clearCache.onclick = async () => {
+        await popConfirm('리스의 자체 캐시를 클리어 합니다, 복원후 일부 리소스(특히 봇 아이콘)가 제대로 표시 되지 않는경우에 사용 할 수 있습니다.', async () => {
+            const wasDeleted = await caches.delete('risuCache');
+            if(wasDeleted) {
+                await popMessage('캐시가 삭제되었습니다.')
+            } else {
+                await popMessage('삭제에 실패했습니다?')
+            }
         }, undefined)
     }
 

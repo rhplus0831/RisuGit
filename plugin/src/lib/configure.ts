@@ -217,3 +217,13 @@ export function getAssetServer() {
 export function setAssetServer(value: string) {
     setMyArgument("git_asset_server", value)
 }
+
+export function getAssetServerConnectionCount() {
+    const value = getMyArgument("git_asset_server_max_connection");
+    if(!value) return 8;
+    return parseInt(value)
+}
+
+export function setAssetServerConnectionCount(value: string) {
+    setMyArgument("git_asset_server_max_connection", value)
+}

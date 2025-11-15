@@ -28,6 +28,7 @@ export function settingLogic(overlay: BaseOverlay, container: HTMLDivElement): (
     // Asset
     const gitAssetServer = container.querySelector<HTMLInputElement>("#git_asset_server")!;
     const gitAssetServerPublic = container.querySelector<HTMLButtonElement>("#git_asset_server_public")!;
+    const gitAssetConnectionCount = container.querySelector<HTMLButtonElement>("#git_asset_max_connection")!;
 
     // Buttons
     const saveButton = container.querySelector<HTMLButtonElement>("#save_button")!;
@@ -49,6 +50,7 @@ export function settingLogic(overlay: BaseOverlay, container: HTMLDivElement): (
     gitBootstrapSavePushOther.checked = configure.getBootstrapSavePushOther();
     gitBootstrapPushAsset.checked = configure.getBootstrapPushAsset();
     gitAssetServer.value = configure.getAssetServer();
+    gitAssetConnectionCount.value = configure.getAssetServerConnectionCount().toString();
 
     // Public server buttons
     gitProxyPublic.onclick = () => {
@@ -75,6 +77,7 @@ export function settingLogic(overlay: BaseOverlay, container: HTMLDivElement): (
         configure.setBootstrapSavePushOther(gitBootstrapSavePushOther.checked);
         configure.setBootstrapPushAsset(gitBootstrapPushAsset.checked);
         configure.setAssetServer(gitAssetServer.value);
+        configure.setAssetServerConnectionCount(gitAssetConnectionCount.value);
         overlay.close();
     };
 

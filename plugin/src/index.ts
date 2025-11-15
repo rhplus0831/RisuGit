@@ -17,5 +17,3 @@ onUnload(() => {
     unloadButton();
     unloadReplacer()
 })
-
-console.log(getAssetList())

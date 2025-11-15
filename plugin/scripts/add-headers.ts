@@ -21,6 +21,7 @@ function main() {
 //@arg git_bootstrap_save_push_other string
 //@arg git_bootstrap_push_asset string
 //@arg git_asset_server string
+//@arg git_asset_server_max_connection string
 
 `
     const newContent = `${header}\n\n${content}`;

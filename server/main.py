@@ -36,10 +36,13 @@ app.add_middleware(
     max_age=86400,
 )
 
+
 @app.middleware("http")
 async def check_risu_git_flag(request: Request, call_next):
-    if (request.method.lower() != "options" and request.method.lower() != "head") and "x-risu-git-flag" not in request.headers:
-        return Response(status_code=400)
+    if (
+            request.method.lower() != "options" and request.method.lower() != "head") and "x-risu-git-flag" not in request.headers:
+        if request.url.path != "/":
+            return Response(status_code=400)
     response = await call_next(request)
     return response
 
@@ -150,6 +153,11 @@ async def head_file(
     exist_cache[filename] = True
 
     return Response(status_code=200, headers=cache_headers)
+
+
+@app.get("/")
+async def index():
+    return Response(status_code=200, content="<html><head></head><body>Risu-Git Asset Server</body></html>")
 
 
 async def cleanup_old_files(

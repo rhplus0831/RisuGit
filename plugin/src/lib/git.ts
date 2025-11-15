@@ -214,6 +214,7 @@ async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, 
         await recursiveRmdir(`${baseDir}/${cidDir}`)
     }
 
+    await safeMkdir(`${baseDir}/${characterDir}`)
     await safeMkdir(`${baseDir}/${cidDir}`)
 
     const encoder = new TextEncoder();

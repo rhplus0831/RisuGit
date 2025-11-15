@@ -17,7 +17,7 @@ export async function retryFetch(url: string | URL | Request, request: RequestIn
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
             const response = await fetch(url, request);
-            if (response.ok) {
+            if (response.status < 500) {
                 return response;
             }
 

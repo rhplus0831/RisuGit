@@ -1,8 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-function main() {
-    const filePath = path.join(__dirname, "..", "dist", "index.js")
+function putInto(name: string) {
+    const filePath = path.join(__dirname, "..", "dist", name)
+    if (!fs.existsSync(filePath)) {
+        console.log(`File not exist: ${filePath}`);
+        return;
+    }
     const content = fs.readFileSync(filePath, 'utf-8');
     const header = `//@name RisuGit
 //@display-name RisuGit (rev 20251115)
@@ -28,6 +32,11 @@ function main() {
     fs.writeFileSync(filePath, newContent, 'utf-8');
     console.log(`✓ Added header to ${filePath}`);
     console.log('\n✅ Done!');
+}
+
+function main() {
+    putInto("index.js")
+    putInto("dist.js")
 }
 
 main();

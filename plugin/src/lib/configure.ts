@@ -166,7 +166,7 @@ export function getBootstrapSavePushCharacter() {
 }
 
 export function setBootstrapSavePushCharacter(value: boolean) {
-    setBoolean("git_bootstrap_save_push_other", value)
+    setBoolean("git_bootstrap_save_push_character", value)
 }
 
 export function getBootstrapSavePushOther() {

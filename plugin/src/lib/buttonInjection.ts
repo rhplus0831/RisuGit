@@ -1,3 +1,4 @@
+import {injectSettingButton} from "./setting-button";
 import {BaseOverlay} from "../ui/baseOverlay";
 import overlayTemplate from '../ui/panel.html';
 import chatTemplate from '../ui/quick.html';
@@ -113,7 +114,7 @@ async function getToolbar() {
     }
 }
 
-const observer = makeMutationObserver([getToolbar, getSetting]);
+const observer = makeMutationObserver([getToolbar, getSetting, injectSettingButton]);
 
 export function unloadButton() {
     observer.disconnect()

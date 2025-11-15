@@ -1,0 +1,90 @@
+<div class="rg-flex rg-flex-col rg-gap-4 rg-w-[600px]">
+    <h1 class="rg-text-2xl rg-font-bold">Risu Git 설정</h1>
+
+    <div class="rg-flex rg-flex-col rg-gap-2">
+        <h2 class="rg-text-lg rg-font-semibold">암호화 관련</h2>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <label for="encrypt_key" class="rg-w-1/3">암호화 비밀번호</label>
+            <input type="password" id="encrypt_key" class="rg-flex-grow rg-p-1 rg-border rg-rounded">
+        </div>
+    </div>
+
+    <div class="rg-flex rg-flex-col rg-gap-2">
+        <h2 class="rg-text-lg rg-font-semibold">Git 관련</h2>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <label for="git_proxy" class="rg-w-1/3">CORS 프록시</label>
+            <input type="text" id="git_proxy" class="rg-flex-grow rg-p-1 rg-border rg-rounded">
+            <button id="git_proxy_public" class="rg-p-1 rg-bg-blue-500 rg-text-white rg-rounded">공개 서버</button>
+        </div>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <label for="git_url" class="rg-w-1/3">Git 저장소 URL</label>
+            <input type="text" id="git_url" class="rg-flex-grow rg-p-1 rg-border rg-rounded">
+        </div>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <label for="git_id" class="rg-w-1/3">Git ID</label>
+            <input type="text" id="git_id" class="rg-flex-grow rg-p-1 rg-border rg-rounded">
+        </div>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <label for="git_password" class="rg-w-1/3">Git 비밀번호</label>
+            <input type="password" id="git_password" class="rg-flex-grow rg-p-1 rg-border rg-rounded">
+        </div>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <label for="git_branch" class="rg-w-1/3">브랜치 이름</label>
+            <input type="text" id="git_branch" class="rg-flex-grow rg-p-1 rg-border rg-rounded">
+        </div>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <label for="git_client_name" class="rg-w-1/3">커밋 저자 이름</label>
+            <input type="text" id="git_client_name" class="rg-flex-grow rg-p-1 rg-border rg-rounded">
+        </div>
+    </div>
+
+    <div class="rg-flex rg-flex-col rg-gap-2">
+        <h2 class="rg-text-lg rg-font-semibold">자동 저장 관련</h2>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <input type="checkbox" id="git_on_request_save_chat" class="rg-h-5 rg-w-5">
+            <label for="git_on_request_save_chat">API 요청 후 현재 채팅 저장 시도</label>
+        </div>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <input type="checkbox" id="git_setting_close_save_other" class="rg-h-5 rg-w-5">
+            <label for="git_setting_close_save_other">설정 창을 닫을 때 다른 항목 저장 시도</label>
+        </div>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <input type="checkbox" id="git_automatic_push" class="rg-h-5 rg-w-5">
+            <label for="git_automatic_push">자동 저장 기능 수행 후 서버로 푸시 시도</label>
+        </div>
+    </div>
+
+    <div class="rg-flex rg-flex-col rg-gap-2">
+        <h2 class="rg-text-lg rg-font-semibold">부팅 시 동작 관련</h2>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <input type="checkbox" id="git_bootstrap_pull" class="rg-h-5 rg-w-5">
+            <label for="git_bootstrap_pull">처음 시작 시 Git 저장소 풀링</label>
+        </div>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <input type="checkbox" id="git_bootstrap_save_push_character" class="rg-h-5 rg-w-5">
+            <label for="git_bootstrap_save_push_character">풀링 후 캐릭터 푸시</label>
+        </div>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <input type="checkbox" id="git_bootstrap_save_push_other" class="rg-h-5 rg-w-5">
+            <label for="git_bootstrap_save_push_other">풀링 후 다른 설정 푸시</label>
+        </div>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <input type="checkbox" id="git_bootstrap_push_asset" class="rg-h-5 rg-w-5">
+            <label for="git_bootstrap_push_asset">에셋 푸시</label>
+        </div>
+    </div>
+
+    <div class="rg-flex rg-flex-col rg-gap-2">
+        <h2 class="rg-text-lg rg-font-semibold">에셋 관련</h2>
+        <div class="rg-flex rg-items-center rg-gap-2">
+            <label for="git_asset_server" class="rg-w-1/3">에셋 서버 URL</label>
+            <input type="text" id="git_asset_server" class="rg-flex-grow rg-p-1 rg-border rg-rounded">
+            <button id="git_asset_server_public" class="rg-p-1 rg-bg-blue-500 rg-text-white rg-rounded">공개 서버</button>
+        </div>
+    </div>
+
+    <div class="rg-flex rg-justify-end rg-gap-4 rg-mt-4">
+        <button id="save_button" class="rg-p-2 rg-bg-green-500 rg-text-white rg-rounded">저장</button>
+        <button id="cancel_button" class="rg-p-2 rg-bg-gray-500 rg-text-white rg-rounded">취소</button>
+    </div>
+</div>

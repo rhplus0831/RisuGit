@@ -22,10 +22,20 @@ function getMimeType(filename: string): string {
 
 export async function pushAsset(path: string, type: string = ""): Promise<boolean> {
     const name = path.replace(/^.*[\\/]/, '')
+
+    const cacheKey = `head_cache_${name}`;
+    const cachedData = localStorage.getItem(cacheKey);
+    if(cachedData) {
+        return false;
+    }
+
     const check = await retryFetch(`${getAssetServer()}/${name}`, {
         method: 'HEAD'
     })
-    if (check.ok) return false;
+    if (check.ok) {
+        localStorage.setItem(cacheKey, "1");
+        return false;
+    }
 
     const data = await forageStorage.getItem(path);
     const blobData = new Blob([data], {

@@ -188,7 +188,7 @@ export function panelLogic(overlay: BaseOverlay, container: HTMLDivElement) {
 
     pullButton.onclick = async () => {
         const progress = await popProgress();
-        await progress.callback("서버에서 받아고오 있습니다...")
+        await progress.callback("서버에서 받아오고 있습니다...")
         try {
             await pullRepository();
             progress.overlay.close()

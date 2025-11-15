@@ -1,5 +1,6 @@
 import { BaseOverlay } from "./baseOverlay";
 import * as configure from "../lib/configure";
+import {getSettingCloseSaveOther} from "../lib/configure";
 
 export function settingLogic(overlay: BaseOverlay, container: HTMLDivElement): () => void {
     // Encryption
@@ -43,7 +44,7 @@ export function settingLogic(overlay: BaseOverlay, container: HTMLDivElement): (
     gitBranch.value = configure.getBranch();
     gitClientName.value = configure.getClientName();
     gitOnRequestSaveChat.checked = configure.getOnRequestSaveChat();
-    gitSettingCloseSaveOther.checked = configure.getBoolean("git_setting_close_save_other", false);
+    gitSettingCloseSaveOther.checked = getSettingCloseSaveOther();
     gitAutomaticPush.checked = configure.getAutomaticPush();
     gitBootstrapPull.checked = configure.getBootstrapPull();
     gitBootstrapSavePushCharacter.checked = configure.getBootstrapSavePushCharacter();
@@ -70,7 +71,7 @@ export function settingLogic(overlay: BaseOverlay, container: HTMLDivElement): (
         configure.setBranch(gitBranch.value);
         configure.setClientName(gitClientName.value);
         configure.setOnRequestSaveChat(gitOnRequestSaveChat.checked);
-        configure.setOnRequestSaveOther(gitSettingCloseSaveOther.checked);
+        configure.setSettingCloseSaveOther(gitSettingCloseSaveOther.checked);
         configure.setAutomaticPush(gitAutomaticPush.checked);
         configure.setBootstrapPull(gitBootstrapPull.checked);
         configure.setBootstrapSavePushCharacter(gitBootstrapSavePushCharacter.checked);

@@ -210,7 +210,7 @@ async function saveCharacter(encryptKey: CryptoKey, character: SlicedCharacter, 
     const {chats, ...remainingCharacter} = character;
 
     // 채팅 아이디를 따로 지정하지 않은경우 전부 날리기
-    if(chatID === undefined) {
+    if (chatID === undefined) {
         await recursiveRmdir(`${baseDir}/${cidDir}`)
     }
 
@@ -343,6 +343,58 @@ export async function saveCharacterAndCommit(message: string = 'Save data', char
     }
 
     await stageAllDeletedFiles();
+
+    // 4. 커밋 실행
+    const sha = await git.commit({
+        fs: fs,
+        dir: baseDir,
+        message,
+        author: {
+            name: getClientName(),
+            email: 'user@risu.app'
+        }
+    });
+
+    const saveEnd = (globalThis.performance ?? {now: () => Date.now()}).now();
+    console.log(`커밋 저장 시간: ${(saveEnd - saveStart).toFixed(2)} ms`);
+    return sha;
+}
+
+export async function saveOtherAndCommit(message: string = '기타 데이터') {
+    let saveStart = 0;
+    saveStart = (globalThis.performance ?? {now: () => Date.now()}).now();
+
+    const fs = await getFs();
+    await ensureGitRepo();
+    const encryptKey = await deriveKey(getEncryptPassword());
+
+    const alreadyExist = await fileExists(`${dir}/keytest.json`);
+    if (alreadyExist) {
+        try {
+            await readAndDecryptFromPath(`${dir}/keytest.json`)
+        } catch (e: any) {
+            if (e.toString().indexOf("OperationError") !== -1) {
+                throw new Error(`현재 저장되어 있는 데이터의 복호화에 실패했습니다, 키가 다를 수 있습니다.\n다른 키를 써야 한다면 고유한 다른 저장소를 쓰는것을 권장합니다.`)
+            } else {
+                throw e;
+            }
+        }
+    } else {
+        throw new Error("전체 백업을 한번은 수행해야 합니다")
+    }
+
+    async function writeAndAdd(filepath: string, data: any) {
+        await _writeAndAdd(encryptKey, filepath, data)
+    }
+
+    const database = getDatabase();
+    await writeAndAdd(`characterOrder.json`, database.characterOrder)
+    await writeAndAdd(`loreBook.json`, database.loreBook)
+    await writeAndAdd(`personas.json`, database.personas)
+    await writeAndAdd(`modules.json`, database.modules)
+    await writeAndAdd(`statics.json`, database.statics)
+    await writeAndAdd(`statistics.json`, database.statistics)
+    await writeAndAdd(`botPresets.json`, database.botPresets)
 
     // 4. 커밋 실행
     const sha = await git.commit({

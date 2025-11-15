@@ -151,7 +151,7 @@ export async function pushAssetsToServer(progressCallback: (message: string) => 
     } finally {
         clearInterval(progressInterval);
         // Final progress report to ensure it shows 100%
-        console.log(`Push server process completed. Total: ${completedAssets}/${assetList}`);
+        console.log(`에셋이 백업되었습니다: ${okCount}개 보냄, ${alreadyExistCount}개 이미 있음, ${failedCount}개 실패`);
     }
     return `에셋이 백업되었습니다: ${okCount}개 보냄, ${alreadyExistCount}개 이미 있음, ${failedCount}개 실패`
 }

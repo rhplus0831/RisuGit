@@ -6,6 +6,8 @@ import chatTemplate from '../ui/quick.html';
 import tailwindStyles from '../../dist/main.css';
 import {panelLogic} from "../ui/panel-logic";
 import {quickLogic} from "../ui/quick-logic";
+import {getSettingCloseSaveOther} from "./configure";
+import {automaticSaveOther} from "./automatic";
 // 주입된 스타일이 중복되지 않도록 한 번만 실행
 (function () {
     let style: HTMLStyleElement | null = document.getElementById('risu-git-styles') as HTMLStyleElement;
@@ -41,6 +43,7 @@ const chatOverlay = new BaseOverlay();
 
 let injectedSettingButton: HTMLButtonElement | null = null;
 const settingOverlay = new BaseOverlay();
+let isInSetting = false;
 
 async function getSetting() {
     if (injectedSettingButton) {
@@ -52,7 +55,11 @@ async function getSetting() {
     // closest returns Element | null; narrow or handle null:
     const settingButtons = document.body.querySelector('.rs-setting-cont-3') as HTMLDivElement | null;
     if (!settingButtons) {
-        //TODO: Notify this?
+        if(isInSetting) {
+            isInSetting = false;
+            if(!getSettingCloseSaveOther()) return;
+            await automaticSaveOther();
+        }
         return
     }
     let button = settingButtons.querySelector<HTMLButtonElement>('#rg-setting-button') as HTMLButtonElement;
@@ -69,6 +76,7 @@ async function getSetting() {
             // 자식이 없으면 그냥 추가
             settingButtons.appendChild(button);
         }
+        isInSetting = true;
     }
     button.onclick = () => {
         settingOverlay.show(overlayTemplate, panelLogic);

@@ -149,11 +149,11 @@ export function setOnRequestSaveChat(value: boolean) {
     setBoolean("git_on_request_save_chat", value)
 }
 
-export function getOnRequestSaveOther() {
+export function getSettingCloseSaveOther() {
     return getBoolean("git_setting_close_save_other", process.env.NODE_ENV === 'development');
 }
 
-export function setOnRequestSaveOther(value: boolean) {
+export function setSettingCloseSaveOther(value: boolean) {
     setBoolean("git_setting_close_save_other", value)
 }
 

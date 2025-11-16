@@ -210,6 +210,7 @@ export async function pullAssetFromServer(progressCallback: (message: string) =>
                     }
                 } catch (error) {
                     console.error(`Failed to upload asset ${assetPath}:`, error);
+                    failedCount++;
                 } finally {
                     completedAssets++;
                 }

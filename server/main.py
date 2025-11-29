@@ -1,10 +1,10 @@
-import os
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, FileResponse, Response
 from sqlmodel import Session, select
-from contextlib import asynccontextmanager
 
 from config import settings
 from database import create_db_and_tables, get_session, Asset
@@ -40,7 +40,7 @@ app.add_middleware(
 @app.middleware("http")
 async def check_risu_git_flag(request: Request, call_next):
     if (
-            request.method.lower() != "options" and request.method.lower() != "head") and "x-risu-git-flag" not in request.headers:
+            request.method.lower() != "options" and request.method.lower() != "get" and request.method.lower() != "head") and "x-risu-git-flag" not in request.headers:
         if request.url.path != "/":
             return Response(status_code=400)
     response = await call_next(request)
@@ -129,7 +129,7 @@ async def get_file(
             return FileResponse(storage.get_path(filename), headers=cache_headers)
         else:
             raise HTTPException(status_code=404, detail="File not found")
-    return RedirectResponse(url=f"{settings.ASSET_URL}/{filename}", headers=cache_headers)
+    return RedirectResponse(status_code=308, url=f"{settings.ASSET_URL}/{filename}", headers=cache_headers)
 
 
 @app.head("/{filename}")
